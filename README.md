@@ -28,9 +28,9 @@ bujotui/
 │   ├── config/         # Configuration parsing (XDG-aware)
 │   ├── mcp/            # MCP protocol, tools, and handler
 │   ├── markdown/       # Markdown file format (read/write)
-│   ├── model/          # Domain types (Entry, Symbol, SymbolSet)
-│   ├── service/        # Business logic (CRUD, transitions, filtering)
-│   ├── storage/        # File-level persistence
+│   ├── model/          # Domain types (Entry, Collection, Habit, FutureEntry)
+│   ├── service/        # Business logic (entries, collections, habits, future log)
+│   ├── storage/        # File-level persistence (atomic writes)
 │   ├── term/           # Raw terminal control (ANSI, termios)
 │   └── tui/            # Terminal UI (rendering, key handling, forms)
 ├── .gitignore
@@ -98,6 +98,12 @@ Press `?` in the TUI to see all keybindings.
 | `Esc` | Clear active filter |
 | `[ ]` | Previous/next day |
 | `t` | Toggle time column |
+| `Enter` | Jump to migration link |
+| `m` | Calendar view |
+| `f` | Future log |
+| `h` | Habit tracker |
+| `p` | Collections |
+| `I` | Index |
 | `?` | Show help |
 | `q` | Quit |
 
@@ -106,7 +112,7 @@ Press `?` in the TUI to see all keybindings.
 | Key | Action |
 |-----|--------|
 | `x` | Mark done |
-| `>` | Mark migrated |
+| `>` | Migrate to date (opens picker) |
 | `<` | Mark scheduled |
 | `c` | Mark cancelled |
 | `r` | Reset state (clear) |
@@ -119,6 +125,76 @@ Press `?` in the TUI to see all keybindings.
 | `Shift+Tab` | Previous field |
 | `Enter` | Accept completion or submit |
 | `Esc` | Cancel |
+
+### Calendar View (`m`)
+
+| Key | Action |
+|-----|--------|
+| `j/k` | Move up/down through days |
+| `[ ]` | Previous/next month |
+| `i/n` | Edit daily note |
+| `Enter` | Open selected day |
+| `Esc` | Back to normal |
+
+### Future Log (`f`)
+
+| Key | Action |
+|-----|--------|
+| `j/k` | Move up/down through entries |
+| `[ ]` | Previous/next month tab |
+| `a` | Add entry to selected month |
+| `d` | Delete entry (confirm y/n) |
+| `Esc` | Back to normal |
+
+### Habit Tracker (`h`)
+
+| Key | Action |
+|-----|--------|
+| `j/k` | Move up/down through habits |
+| `[ ]` | Previous/next day column |
+| `x` / `Space` | Toggle habit for selected day |
+| `a` | Add new habit |
+| `d` | Delete habit (confirm y/n) |
+| `Esc` | Back to normal |
+
+### Collections (`p`)
+
+| Key | Action |
+|-----|--------|
+| `j/k` | Move up/down |
+| `a` | Create new collection |
+| `d` | Delete collection (confirm y/n) |
+| `Enter` | Open collection |
+| `Esc` | Back to normal |
+
+Within a collection:
+
+| Key | Action |
+|-----|--------|
+| `j/k` | Move up/down |
+| `a` | Add item |
+| `e` | Edit item |
+| `d` | Delete item |
+| `x` / `Space` | Toggle done |
+| `J/K` | Reorder items |
+| `Esc` | Back to collections list |
+
+### Index (`I`)
+
+| Key | Action |
+|-----|--------|
+| `j/k` | Move up/down |
+| `/` | Filter/search |
+| `Enter` | Open (collection or project filter) |
+| `Esc` | Back to normal |
+
+### Migration Linking
+
+When an entry is migrated with `>`, both sides get linked:
+- Original: `-> 2026-04-01` (shown in cyan)
+- Copy: `<- 2026-03-28` (shown in cyan)
+
+Press `Enter` on a linked entry to jump to the target/source date.
 
 ### Filter Syntax
 
@@ -199,9 +275,11 @@ symbol = task
 
 ## MCP Server
 
-bujotui includes an MCP server (`bujotui-mcp`) that exposes journal operations as tools over stdio. This lets AI agents (Claude Code, etc.) read and write journal entries.
+bujotui includes an MCP server (`bujotui-mcp`) that exposes journal operations as tools over stdio. This lets AI agents (Claude Code, etc.) read and write journal entries, collections, habits, and the future log.
 
 ### MCP Tools
+
+#### Journal Entries
 
 | Tool | Description |
 |------|-------------|
@@ -213,6 +291,36 @@ bujotui includes an MCP server (`bujotui-mcp`) that exposes journal operations a
 | `set_note` | Set daily note for a date |
 | `list_month` | List all entries and notes for a month |
 | `search` | Search entries across all fields |
+
+#### Collections
+
+| Tool | Description |
+|------|-------------|
+| `list_collections` | List all collection names |
+| `get_collection` | Get a collection's items |
+| `create_collection` | Create a new empty collection |
+| `delete_collection` | Delete a collection |
+| `add_collection_item` | Add an item to a collection |
+| `remove_collection_item` | Remove an item by index |
+| `toggle_collection_item` | Toggle item done state |
+
+#### Habits
+
+| Tool | Description |
+|------|-------------|
+| `list_habits` | List habit names for a month |
+| `add_habit` | Add a new habit to track |
+| `remove_habit` | Remove a habit |
+| `toggle_habit` | Toggle habit completion for a day |
+| `get_habits_month` | Get full habit data with streaks |
+
+#### Future Log
+
+| Tool | Description |
+|------|-------------|
+| `list_future` | List future log entries for a year |
+| `add_future_entry` | Add an entry to a future month |
+| `remove_future_entry` | Remove a future log entry |
 
 ### Usage with Claude Code
 
@@ -245,10 +353,14 @@ bujotui-mcp -version                 # print version and exit
 
 ## Data Format
 
-Entries are stored as markdown in monthly files under the data directory:
+All data is stored as markdown files under the data directory (`~/.local/share/bujotui/`).
+
+### Daily Entries
+
+Monthly files in `daily/`:
 
 ```
-~/.local/share/bujotui/daily/2026-03.md
+daily/2026-03.md
 ```
 
 ```markdown
@@ -256,6 +368,62 @@ Entries are stored as markdown in monthly files under the data directory:
 
 - . 2026-03-27T14:30 [project] @person Description text
 - . 2026-03-27T15:00 [work] @self state:done Finished the report
+- . 2026-03-27T16:00 [work] @self state:migrated ->2026-03-28 Fix the bug
+```
+
+Migration links are stored inline: `->YYYY-MM-DD` on the source, `<-YYYY-MM-DD` on the copy.
+
+### Collections
+
+One file per collection in `collections/`:
+
+```
+collections/books-to-read.md
+```
+
+```markdown
+# Books to Read
+
+- [ ] The Pragmatic Programmer
+- [x] Clean Code
+- [ ] Designing Data-Intensive Applications
+```
+
+### Habits
+
+Monthly files in `habits/`:
+
+```
+habits/2026-03.md
+```
+
+```markdown
+# Habits 2026-03
+
+## Exercise
+1,3,5,7,10,15
+
+## Read
+1,2,3,4,5,6,7
+```
+
+### Future Log
+
+Yearly files in `future/`:
+
+```
+future/2026.md
+```
+
+```markdown
+# Future Log 2026
+
+## April
+- . Doctor appointment
+- o Conference
+
+## June
+- . Tax deadline
 ```
 
 ## Contributions
