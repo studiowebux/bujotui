@@ -79,12 +79,12 @@ func (a *App) handleHabitKey(key Key) bool {
 			a.state.HabRow--
 		}
 
-	case key.Char == 'l' || key.Special == KeyRight:
+	case key.Char == ']' || key.Special == KeyRight:
 		if a.state.HabCol < ht.NumDays-1 {
 			a.state.HabCol++
 		}
 
-	case key.Char == 'H' || key.Special == KeyLeft:
+	case key.Char == '[' || key.Special == KeyLeft:
 		if a.state.HabCol > 0 {
 			a.state.HabCol--
 		}

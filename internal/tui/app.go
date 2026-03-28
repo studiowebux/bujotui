@@ -21,6 +21,7 @@ type App struct {
 	svc    *service.EntryService
 	colSvc *service.CollectionService
 	habSvc *service.HabitService
+	futSvc *service.FutureLogService
 	cfg    *config.Config
 	completer *complete.Completer
 
@@ -39,7 +40,7 @@ type App struct {
 }
 
 // New creates a new TUI App.
-func New(svc *service.EntryService, colSvc *service.CollectionService, habSvc *service.HabitService, cfg *config.Config) *App {
+func New(svc *service.EntryService, colSvc *service.CollectionService, habSvc *service.HabitService, futSvc *service.FutureLogService, cfg *config.Config) *App {
 	comp := complete.New(
 		cfg.Symbols.SymbolNames(),
 		cfg.Projects,
@@ -50,6 +51,7 @@ func New(svc *service.EntryService, colSvc *service.CollectionService, habSvc *s
 		svc:    svc,
 		colSvc: colSvc,
 		habSvc: habSvc,
+		futSvc: futSvc,
 		cfg:    cfg,
 		completer: comp,
 		state:     NewViewState(cfg),
@@ -151,6 +153,8 @@ func (a *App) handleKey(key Key) bool {
 		return a.handleIndexKey(key)
 	case ModeHabit:
 		return a.handleHabitKey(key)
+	case ModeFuture:
+		return a.handleFutureKey(key)
 	}
 	return false
 }

@@ -196,13 +196,12 @@ bottom:
 	if vs.StatusMsg != "" {
 		fmt.Fprintf(w, " %s%s%s", term.FgRed+term.Bold, vs.StatusMsg, term.Reset)
 	} else {
-		fmt.Fprintf(w, " %sj/k%s up/down %s|%s %sH/l%s left/right %s|%s %sx%s toggle %s|%s %sa%s add %s|%s %sd%s del %s|%s %s[%s prev %s]%s next %s|%s %sEsc%s back",
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+		fmt.Fprintf(w, " %sj/k%s move %s|%s %s[%s prev %s]%s next %s|%s %sx%s toggle %s|%s %sa%s add %s|%s %sd%s del %s|%s %sEsc%s back",
 			term.FgCyan, term.Reset, term.FgGray, term.Reset,
 			term.FgCyan, term.Reset, term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
 			term.FgCyan, term.Reset)
 	}
 

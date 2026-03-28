@@ -241,6 +241,43 @@ func ToolList() ToolsListResult {
 					}
 				}`),
 			},
+			{
+				Name:        "list_future",
+				Description: "List future log entries for a year.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"year": {"type": "integer", "description": "Year (default: current year)"}
+					}
+				}`),
+			},
+			{
+				Name:        "add_future_entry",
+				Description: "Add an entry to the future log for a specific month.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"year":        {"type": "integer", "description": "Year (default: current year)"},
+						"month":       {"type": "integer", "description": "Month (1-12)"},
+						"symbol":      {"type": "string", "description": "Entry type (default: task)"},
+						"description": {"type": "string", "description": "Entry description"}
+					},
+					"required": ["month", "description"]
+				}`),
+			},
+			{
+				Name:        "remove_future_entry",
+				Description: "Remove an entry from the future log by index.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"year":  {"type": "integer", "description": "Year (default: current year)"},
+						"month": {"type": "integer", "description": "Month (1-12)"},
+						"index": {"type": "integer", "description": "Entry index (0-based)"}
+					},
+					"required": ["month", "index"]
+				}`),
+			},
 		},
 	}
 }

@@ -22,6 +22,7 @@ const (
 	ModeCollection   // viewing/editing a single collection
 	ModeIndex        // searchable index of collections/projects
 	ModeHabit        // habit tracker grid
+	ModeFuture       // future log view
 )
 
 // ViewState holds all view-layer state. This never leaks into model or data.
@@ -86,6 +87,15 @@ type ViewState struct {
 	HabAdding   bool                // adding a new habit
 	HabEditBuf  EditBuffer
 	HabConfirm  bool                // confirming a delete
+
+	// Future log state
+	FutYear     int                // displayed year
+	FutMonths   []FutureViewMonth  // loaded months (6 months from current)
+	FutMonthIdx int                // selected month index
+	FutItemIdx  int                // selected entry within month
+	FutAdding   bool               // adding a new entry
+	FutEditBuf  EditBuffer
+	FutConfirm  bool               // confirming a delete
 
 	// Index state
 	IdxEntries    []IndexEntry // all index entries
@@ -232,6 +242,20 @@ type ColViewItem struct {
 type IndexEntry struct {
 	Kind string // "collection" or "project"
 	Name string
+}
+
+// FutureViewMonth holds one month's data for display.
+type FutureViewMonth struct {
+	Year    int
+	Month   int    // 1-12
+	Label   string // "January 2026"
+	Entries []FutureViewEntry
+}
+
+// FutureViewEntry is a single future log item for display.
+type FutureViewEntry struct {
+	Symbol string
+	Desc   string
 }
 
 // HabitViewData holds habit data for TUI display.

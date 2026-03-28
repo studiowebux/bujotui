@@ -56,6 +56,10 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 		renderHabit(w, vs)
 		return
 	}
+	if vs.Mode == ModeFuture {
+		renderFuture(w, vs)
+		return
+	}
 
 	term.MoveCursor(w, 1, 1)
 
@@ -192,6 +196,7 @@ func renderHelpBar(w io.Writer, width int) {
 		{"t", "time"},
 		{"/", "filter"},
 		{"m", "calendar"},
+		{"f", "future"},
 		{"h", "habits"},
 		{"p", "collections"},
 		{"I", "index"},
@@ -848,6 +853,7 @@ func renderHelpScreen(w io.Writer, vs *ViewState) {
 		mkKey("[ ]", "Previous/next day"),
 		mkKey("t", "Toggle time display"),
 		mkKey("m", "Calendar view"),
+		mkKey("f", "Future log"),
 		mkKey("h", "Habit tracker"),
 		mkKey("p", "Collections"),
 		mkKey("I", "Index"),

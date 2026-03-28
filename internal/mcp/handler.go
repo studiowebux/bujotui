@@ -9,15 +9,16 @@ import (
 	"github.com/studiowebux/bujotui/internal/service"
 )
 
-// Handler dispatches MCP tool calls to the EntryService, CollectionService, and HabitService.
+// Handler dispatches MCP tool calls.
 type Handler struct {
 	svc    *service.EntryService
 	colSvc *service.CollectionService
 	habSvc *service.HabitService
+	futSvc *service.FutureLogService
 }
 
-func NewHandler(svc *service.EntryService, colSvc *service.CollectionService, habSvc *service.HabitService) *Handler {
-	return &Handler{svc: svc, colSvc: colSvc, habSvc: habSvc}
+func NewHandler(svc *service.EntryService, colSvc *service.CollectionService, habSvc *service.HabitService, futSvc *service.FutureLogService) *Handler {
+	return &Handler{svc: svc, colSvc: colSvc, habSvc: habSvc, futSvc: futSvc}
 }
 
 func (h *Handler) HandleToolCall(name string, args json.RawMessage) ToolResult {
@@ -62,6 +63,12 @@ func (h *Handler) HandleToolCall(name string, args json.RawMessage) ToolResult {
 		return h.toggleHabit(args)
 	case "get_habits_month":
 		return h.getHabitsMonth(args)
+	case "list_future":
+		return h.listFuture(args)
+	case "add_future_entry":
+		return h.addFutureEntry(args)
+	case "remove_future_entry":
+		return h.removeFutureEntry(args)
 	default:
 		return ErrorResult("unknown tool: %s", name)
 	}
@@ -593,6 +600,77 @@ func parseMonth(s string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid month format (expected YYYY-MM): %v", err)
 	}
 	return t, nil
+}
+
+func (h *Handler) listFuture(args json.RawMessage) ToolResult {
+	var p struct {
+		Year int `json:"year"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+	if p.Year == 0 {
+		p.Year = time.Now().Year()
+	}
+
+	months, err := h.futSvc.LoadYear(p.Year)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	if len(months) == 0 {
+		return TextResult(fmt.Sprintf("No future log entries for %d.", p.Year))
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Future Log %d:\n\n", p.Year)
+	for _, m := range months {
+		fmt.Fprintf(&b, "## %s\n", time.Month(m.Month).String())
+		for i, e := range m.Entries {
+			fmt.Fprintf(&b, "  %d. %s %s\n", i, e.Symbol.Name, e.Description)
+		}
+		b.WriteByte('\n')
+	}
+	return TextResult(b.String())
+}
+
+func (h *Handler) addFutureEntry(args json.RawMessage) ToolResult {
+	var p struct {
+		Year        int    `json:"year"`
+		Month       int    `json:"month"`
+		Symbol      string `json:"symbol"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+	if p.Year == 0 {
+		p.Year = time.Now().Year()
+	}
+
+	if err := h.futSvc.AddEntry(p.Year, p.Month, p.Symbol, p.Description); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Added to %s %d: %s", time.Month(p.Month).String(), p.Year, p.Description))
+}
+
+func (h *Handler) removeFutureEntry(args json.RawMessage) ToolResult {
+	var p struct {
+		Year  int `json:"year"`
+		Month int `json:"month"`
+		Index int `json:"index"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+	if p.Year == 0 {
+		p.Year = time.Now().Year()
+	}
+
+	if err := h.futSvc.RemoveEntry(p.Year, p.Month, p.Index); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Removed entry %d from %s %d", p.Index, time.Month(p.Month).String(), p.Year))
 }
 
 func (h *Handler) toggleCollectionItem(args json.RawMessage) ToolResult {

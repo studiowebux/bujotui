@@ -179,6 +179,9 @@ func (a *App) handleNormalKey(key Key) bool {
 
 	case key.Char == 'h':
 		a.enterHabit()
+
+	case key.Char == 'f':
+		a.enterFuture()
 	}
 
 	return false
