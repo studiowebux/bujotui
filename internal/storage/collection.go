@@ -17,7 +17,7 @@ func (s *Store) collectionsDir() string {
 
 // ensureCollectionsDir creates the collections directory if it doesn't exist.
 func (s *Store) ensureCollectionsDir() error {
-	return os.MkdirAll(s.collectionsDir(), 0o750)
+	return os.MkdirAll(s.collectionsDir(), 0o700)
 }
 
 // collectionFile returns the path for a collection's markdown file.

@@ -21,7 +21,7 @@ type Store struct {
 // NewStore creates a Store and ensures required directories exist.
 func NewStore(cfg *config.Config) (*Store, error) {
 	dailyDir := filepath.Join(cfg.DataDir, "daily")
-	if err := os.MkdirAll(dailyDir, 0o750); err != nil {
+	if err := os.MkdirAll(dailyDir, 0o700); err != nil {
 		return nil, fmt.Errorf("create daily dir: %w", err)
 	}
 	return &Store{Dir: cfg.DataDir, Config: cfg}, nil

@@ -8,6 +8,16 @@ import (
 	"github.com/studiowebux/bujotui/internal/storage"
 )
 
+// hasAlphanumeric returns true if s contains at least one letter or digit.
+func hasAlphanumeric(s string) bool {
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return true
+		}
+	}
+	return false
+}
+
 // CollectionService encapsulates business logic for collections.
 type CollectionService struct {
 	store *storage.Store
@@ -44,6 +54,9 @@ func (s *CollectionService) Create(name string) (model.Collection, error) {
 	}
 	if len(name) > 100 {
 		return model.Collection{}, fmt.Errorf("collection name too long (max 100 characters)")
+	}
+	if !hasAlphanumeric(name) {
+		return model.Collection{}, fmt.Errorf("collection name must contain at least one letter or digit")
 	}
 
 	// Check if already exists

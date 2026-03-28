@@ -90,12 +90,6 @@ func DefaultDataDir() string {
 	return filepath.Join(home, ".local", "share", "bujotui")
 }
 
-// DefaultDir returns the default bujotui config directory.
-// Deprecated: use DefaultConfigDir and DefaultDataDir instead.
-func DefaultDir() string {
-	return DefaultConfigDir()
-}
-
 // Load reads and parses the config from the given config directory.
 // dataDir specifies where journal data (daily/) is stored.
 // If bujotui.conf does not exist, returns a config with built-in defaults.
@@ -114,7 +108,7 @@ func Load(configDir, dataDir string) (*Config, error) {
 
 // Init writes the default config file to the given directory.
 func Init(dir string) error {
-	if err := os.MkdirAll(dir, 0o750); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create dir: %w", err)
 	}
 	confPath := filepath.Join(dir, "bujotui.conf")

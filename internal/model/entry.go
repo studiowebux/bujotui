@@ -9,9 +9,16 @@ type Symbol struct {
 }
 
 // Entry is a single bullet journal log entry.
+//
+// State holds the lifecycle state of the entry. Valid values:
+//   - "" (empty string) — active, no state applied
+//   - "done" — completed
+//   - "migrated" — moved to another date (see MigratedTo)
+//   - "scheduled" — deferred to a future date
+//   - "cancelled" — no longer relevant
 type Entry struct {
 	Symbol      Symbol // entry type: task, event, note, idea, urgent, waiting
-	State       string // lifecycle state: "" (active), "done", "migrated", "scheduled", "cancelled"
+	State       string // lifecycle state (see Entry doc)
 	Project     string
 	Person      string
 	Description string

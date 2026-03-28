@@ -19,7 +19,7 @@ func (s *Store) futureDir() string {
 
 // ensureFutureDir creates the future directory if needed.
 func (s *Store) ensureFutureDir() error {
-	return os.MkdirAll(s.futureDir(), 0o750)
+	return os.MkdirAll(s.futureDir(), 0o700)
 }
 
 // futureFile returns the path for a year's future log.

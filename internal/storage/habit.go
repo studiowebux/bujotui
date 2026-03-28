@@ -19,7 +19,7 @@ func (s *Store) habitsDir() string {
 
 // ensureHabitsDir creates the habits directory if needed.
 func (s *Store) ensureHabitsDir() error {
-	return os.MkdirAll(s.habitsDir(), 0o750)
+	return os.MkdirAll(s.habitsDir(), 0o700)
 }
 
 // habitFile returns the path for a month's habit file.

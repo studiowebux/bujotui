@@ -77,8 +77,12 @@ func (s *HabitService) RemoveHabit(month time.Time, name string) error {
 	return s.store.SaveHabits(month, ht)
 }
 
-// Toggle flips a habit's completion for a given day.
+// Toggle flips a habit's completion for a given day (1-31).
 func (s *HabitService) Toggle(month time.Time, habit string, day int) error {
+	if day < 1 || day > 31 {
+		return fmt.Errorf("day must be 1-31, got %d", day)
+	}
+
 	ht, err := s.store.LoadHabits(month)
 	if err != nil {
 		return err

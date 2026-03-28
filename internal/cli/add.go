@@ -34,7 +34,7 @@ func cmdAdd(args []string, store *storage.Store, stdout io.Writer) error {
 	var dt time.Time
 	if *dateStr != "" {
 		var err error
-		dt, err = time.Parse("2006-01-02T15:04", *dateStr)
+		dt, err = time.ParseInLocation("2006-01-02T15:04", *dateStr, time.Local)
 		if err != nil {
 			return fmt.Errorf("bujotui add: invalid datetime %q (expected YYYY-MM-DDThh:mm): %w", *dateStr, err)
 		}
