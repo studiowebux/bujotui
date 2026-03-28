@@ -89,11 +89,9 @@ func (a *App) handleCalendarKey(key Key) bool {
 func (a *App) handleCalendarNoteEdit(key Key) bool {
 	switch {
 	case key.Special == KeyEscape:
-		// Cancel editing
 		a.state.CalEditing = false
 
 	case key.Special == KeyEnter:
-		// Save the note
 		day := a.state.CalCursor + 1
 		note := a.state.CalNoteBuf.String()
 		date := time.Date(
@@ -107,34 +105,8 @@ func (a *App) handleCalendarNoteEdit(key Key) bool {
 		}
 		a.state.CalEditing = false
 
-	case key.Special == KeyBackspace:
-		a.state.CalNoteBuf.DeleteChar()
-	case key.Special == KeyDelete:
-		a.state.CalNoteBuf.DeleteCharForward()
-	case key.Special == KeyLeft:
-		if a.state.CalNoteBuf.Cursor > 0 {
-			a.state.CalNoteBuf.Cursor--
-		}
-	case key.Special == KeyRight:
-		if a.state.CalNoteBuf.Cursor < len(a.state.CalNoteBuf.Data) {
-			a.state.CalNoteBuf.Cursor++
-		}
-	case key.Special == KeyWordLeft:
-		a.state.CalNoteBuf.WordLeft()
-	case key.Special == KeyWordRight:
-		a.state.CalNoteBuf.WordRight()
-	case key.Special == KeyDeleteWord:
-		a.state.CalNoteBuf.DeleteWord()
-	case key.Special == KeyHome:
-		a.state.CalNoteBuf.Cursor = 0
-	case key.Special == KeyEnd:
-		a.state.CalNoteBuf.Cursor = len(a.state.CalNoteBuf.Data)
-	case key.Special == KeyKillLine:
-		a.state.CalNoteBuf.KillLine()
-	case key.Special == KeyKillBack:
-		a.state.CalNoteBuf.KillBack()
-	case key.Char != 0:
-		a.state.CalNoteBuf.InsertChar(key.Char)
+	default:
+		a.state.CalNoteBuf.HandleKey(key)
 	}
 
 	return false

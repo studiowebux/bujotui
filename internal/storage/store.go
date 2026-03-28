@@ -32,7 +32,8 @@ func (s *Store) MonthFile(t time.Time) string {
 	return filepath.Join(s.Dir, "daily", t.Format("2006-01")+".md")
 }
 
-// LoadMonth reads and parses the monthly file. Returns empty slice if file doesn't exist.
+// LoadMonth reads and parses the monthly file.
+// Returns (nil, nil) if the file does not exist — callers should treat nil as empty.
 func (s *Store) LoadMonth(t time.Time) ([]model.DayLog, error) {
 	path := filepath.Clean(s.MonthFile(t))
 	f, err := os.Open(path) // #nosec G304 -- path is constructed from user-configured data dir

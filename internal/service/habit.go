@@ -34,6 +34,9 @@ func (s *HabitService) AddHabit(month time.Time, name string) error {
 	if name == "" {
 		return fmt.Errorf("habit name must not be empty")
 	}
+	if len(name) > 100 {
+		return fmt.Errorf("habit name too long (max 100 characters)")
+	}
 
 	ht, err := s.store.LoadHabits(month)
 	if err != nil {

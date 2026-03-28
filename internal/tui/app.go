@@ -33,7 +33,9 @@ type App struct {
 	tty   *os.File
 	ttyFd uintptr
 
-	sizeMu sync.Mutex // protects Width/Height from SIGWINCH goroutine
+	sizeMu     sync.Mutex // protects sizeW/sizeH written by SIGWINCH goroutine
+	sizeW      int
+	sizeH      int
 }
 
 // New creates a new TUI App.
@@ -86,7 +88,6 @@ func (a *App) Run() error {
 	go func() {
 		for range sigCh {
 			a.updateSize()
-			a.render()
 		}
 	}()
 
@@ -101,8 +102,9 @@ func (a *App) Run() error {
 	for {
 		n, err := syscall.Read(int(a.ttyFd), buf) // #nosec G115 -- ttyFd is a valid file descriptor
 		if err != nil {
-			// SIGWINCH interrupts read with EINTR, just retry
+			// SIGWINCH interrupts read with EINTR — re-render with new size
 			if err == syscall.EINTR {
+				a.render()
 				continue
 			}
 			break
@@ -156,11 +158,10 @@ func (a *App) handleKey(key Key) bool {
 // render delegates to the Render function.
 // It renders into a buffer then writes the whole frame at once to avoid flicker.
 func (a *App) render() {
+	a.syncSize()
 	var buf bytes.Buffer
 	dateStr := a.date.Format("2006-01-02") + " " + a.date.Format("Mon")[:2]
-	a.sizeMu.Lock()
 	Render(&buf, a.entries, dateStr, a.state)
-	a.sizeMu.Unlock()
 	a.tty.Write(buf.Bytes())
 }
 
@@ -204,22 +205,27 @@ func matchesFilter(e model.Entry, vs *ViewState) bool {
 }
 
 // updateSize reads the current terminal dimensions with mutex protection.
+// Called from the SIGWINCH goroutine — writes to sizeW/sizeH only.
 func (a *App) updateSize() {
 	rows, cols, err := term.GetSize(a.ttyFd)
 	a.sizeMu.Lock()
 	defer a.sizeMu.Unlock()
 	if err == nil {
-		a.state.Width = cols
-		a.state.Height = rows
-	} else {
-		// Fallback defaults when size cannot be determined.
-		if a.state.Width == 0 {
-			a.state.Width = 80
-		}
-		if a.state.Height == 0 {
-			a.state.Height = 24
-		}
+		a.sizeW = cols
+		a.sizeH = rows
+	} else if a.sizeW == 0 {
+		a.sizeW = 80
+		a.sizeH = 24
 	}
+}
+
+// syncSize copies terminal dimensions from the goroutine-safe fields
+// into ViewState. Called only from the main loop.
+func (a *App) syncSize() {
+	a.sizeMu.Lock()
+	a.state.Width = a.sizeW
+	a.state.Height = a.sizeH
+	a.sizeMu.Unlock()
 }
 
 // clampCursor ensures the cursor stays within valid bounds for the

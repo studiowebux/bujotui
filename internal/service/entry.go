@@ -10,6 +10,14 @@ import (
 	"github.com/studiowebux/bujotui/internal/storage"
 )
 
+// checkIndex validates that index is within [0, length).
+func checkIndex(index, length int) error {
+	if index < 0 || index >= length {
+		return fmt.Errorf("index %d out of range (0-%d)", index, length-1)
+	}
+	return nil
+}
+
 // EntryService encapsulates business logic for journal entries.
 // It depends only on storage and config — never on the TUI layer.
 type EntryService struct {
@@ -83,8 +91,8 @@ func (s *EntryService) EditEntry(date time.Time, index int, symbol, state, proje
 	if err != nil {
 		return fmt.Errorf("load day: %w", err)
 	}
-	if index < 0 || index >= len(entries) {
-		return fmt.Errorf("entry index %d out of range (0-%d)", index, len(entries)-1)
+	if err := checkIndex(index, len(entries)); err != nil {
+		return err
 	}
 
 	updated := model.Entry{
@@ -118,8 +126,8 @@ func (s *EntryService) TransitionEntry(date time.Time, index int, targetState st
 	if err != nil {
 		return fmt.Errorf("load day: %w", err)
 	}
-	if index < 0 || index >= len(entries) {
-		return fmt.Errorf("entry index %d out of range (0-%d)", index, len(entries)-1)
+	if err := checkIndex(index, len(entries)); err != nil {
+		return err
 	}
 
 	entry := entries[index]
@@ -151,8 +159,8 @@ func (s *EntryService) ResetState(date time.Time, index int) error {
 	if err != nil {
 		return fmt.Errorf("load day: %w", err)
 	}
-	if index < 0 || index >= len(entries) {
-		return fmt.Errorf("entry index %d out of range (0-%d)", index, len(entries)-1)
+	if err := checkIndex(index, len(entries)); err != nil {
+		return err
 	}
 
 	entry := entries[index]
@@ -173,8 +181,8 @@ func (s *EntryService) MigrateEntry(sourceDate time.Time, index int, targetDate 
 	if err != nil {
 		return fmt.Errorf("load source day: %w", err)
 	}
-	if index < 0 || index >= len(entries) {
-		return fmt.Errorf("entry index %d out of range (0-%d)", index, len(entries)-1)
+	if err := checkIndex(index, len(entries)); err != nil {
+		return err
 	}
 
 	entry := entries[index]

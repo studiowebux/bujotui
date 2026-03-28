@@ -96,3 +96,41 @@ func (b *EditBuffer) Set(s string) {
 	b.Data = []byte(s)
 	b.Cursor = len(b.Data)
 }
+
+// HandleKey processes common text-editing keys on the buffer.
+// Returns true if the key was handled.
+func (b *EditBuffer) HandleKey(key Key) bool {
+	switch {
+	case key.Special == KeyBackspace:
+		b.DeleteChar()
+	case key.Special == KeyDelete:
+		b.DeleteCharForward()
+	case key.Special == KeyLeft:
+		if b.Cursor > 0 {
+			b.Cursor--
+		}
+	case key.Special == KeyRight:
+		if b.Cursor < len(b.Data) {
+			b.Cursor++
+		}
+	case key.Special == KeyWordLeft:
+		b.WordLeft()
+	case key.Special == KeyWordRight:
+		b.WordRight()
+	case key.Special == KeyDeleteWord:
+		b.DeleteWord()
+	case key.Special == KeyHome:
+		b.Cursor = 0
+	case key.Special == KeyEnd:
+		b.Cursor = len(b.Data)
+	case key.Special == KeyKillLine:
+		b.KillLine()
+	case key.Special == KeyKillBack:
+		b.KillBack()
+	case key.Char != 0:
+		b.InsertChar(key.Char)
+	default:
+		return false
+	}
+	return true
+}

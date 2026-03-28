@@ -42,6 +42,9 @@ func (s *CollectionService) Create(name string) (model.Collection, error) {
 	if name == "" {
 		return model.Collection{}, fmt.Errorf("collection name must not be empty")
 	}
+	if len(name) > 100 {
+		return model.Collection{}, fmt.Errorf("collection name too long (max 100 characters)")
+	}
 
 	// Check if already exists
 	if _, err := s.store.LoadCollection(name); err == nil {
@@ -86,8 +89,8 @@ func (s *CollectionService) RemoveItem(name string, index int) error {
 		return err
 	}
 
-	if index < 0 || index >= len(col.Items) {
-		return fmt.Errorf("item index %d out of range (0-%d)", index, len(col.Items)-1)
+	if err := checkIndex(index, len(col.Items)); err != nil {
+		return err
 	}
 
 	col.Items = append(col.Items[:index], col.Items[index+1:]...)
@@ -101,8 +104,8 @@ func (s *CollectionService) ToggleItem(name string, index int) error {
 		return err
 	}
 
-	if index < 0 || index >= len(col.Items) {
-		return fmt.Errorf("item index %d out of range (0-%d)", index, len(col.Items)-1)
+	if err := checkIndex(index, len(col.Items)); err != nil {
+		return err
 	}
 
 	col.Items[index].Done = !col.Items[index].Done
@@ -121,8 +124,8 @@ func (s *CollectionService) EditItem(name string, index int, text string) error 
 		return err
 	}
 
-	if index < 0 || index >= len(col.Items) {
-		return fmt.Errorf("item index %d out of range (0-%d)", index, len(col.Items)-1)
+	if err := checkIndex(index, len(col.Items)); err != nil {
+		return err
 	}
 
 	col.Items[index].Text = text
@@ -136,15 +139,20 @@ func (s *CollectionService) MoveItem(name string, from, to int) error {
 		return err
 	}
 
-	if from < 0 || from >= len(col.Items) {
-		return fmt.Errorf("from index %d out of range (0-%d)", from, len(col.Items)-1)
+	if err := checkIndex(from, len(col.Items)); err != nil {
+		return err
 	}
-	if to < 0 || to >= len(col.Items) {
-		return fmt.Errorf("to index %d out of range (0-%d)", to, len(col.Items)-1)
+	if err := checkIndex(to, len(col.Items)); err != nil {
+		return err
 	}
 
 	item := col.Items[from]
 	col.Items = append(col.Items[:from], col.Items[from+1:]...)
+
+	// Adjust target index since the slice shrank by one
+	if from < to {
+		to--
+	}
 
 	// Insert at target position
 	result := make([]model.CollectionItem, 0, len(col.Items)+1)

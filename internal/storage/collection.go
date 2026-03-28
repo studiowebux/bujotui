@@ -41,10 +41,10 @@ func (s *Store) ListCollections() ([]string, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		// Read the title from the file (first # heading)
+		// Read the title from the file; fall back to filename without extension
 		name, err := s.readCollectionName(filepath.Join(dir, e.Name()))
 		if err != nil {
-			continue
+			name = strings.TrimSuffix(e.Name(), ".md")
 		}
 		names = append(names, name)
 	}

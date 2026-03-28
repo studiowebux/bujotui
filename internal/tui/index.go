@@ -129,33 +129,9 @@ func (a *App) handleIndexFilter(key Key) bool {
 
 	case key.Special == KeyEnter:
 		a.state.IdxFiltering = false
-		// Keep the filter applied
 
-	case key.Special == KeyBackspace:
-		a.state.IdxFilterBuf.DeleteChar()
-		a.applyIndexFilter()
-	case key.Special == KeyDelete:
-		a.state.IdxFilterBuf.DeleteCharForward()
-		a.applyIndexFilter()
-	case key.Special == KeyWordLeft:
-		a.state.IdxFilterBuf.WordLeft()
-	case key.Special == KeyWordRight:
-		a.state.IdxFilterBuf.WordRight()
-	case key.Special == KeyDeleteWord:
-		a.state.IdxFilterBuf.DeleteWord()
-		a.applyIndexFilter()
-	case key.Special == KeyHome:
-		a.state.IdxFilterBuf.Cursor = 0
-	case key.Special == KeyEnd:
-		a.state.IdxFilterBuf.Cursor = len(a.state.IdxFilterBuf.Data)
-	case key.Special == KeyKillLine:
-		a.state.IdxFilterBuf.KillLine()
-		a.applyIndexFilter()
-	case key.Special == KeyKillBack:
-		a.state.IdxFilterBuf.KillBack()
-		a.applyIndexFilter()
-	case key.Char != 0:
-		a.state.IdxFilterBuf.InsertChar(key.Char)
+	default:
+		a.state.IdxFilterBuf.HandleKey(key)
 		a.applyIndexFilter()
 	}
 

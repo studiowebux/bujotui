@@ -141,7 +141,6 @@ func (a *App) handleHabitAdd(key Key) bool {
 				a.state.StatusMsg = err.Error()
 			} else {
 				a.reloadHabits()
-				// Move cursor to new habit
 				if a.state.HabTracker != nil {
 					a.state.HabRow = len(a.state.HabTracker.Habits) - 1
 				}
@@ -150,34 +149,8 @@ func (a *App) handleHabitAdd(key Key) bool {
 		a.state.HabAdding = false
 		a.state.HabEditBuf.Clear()
 
-	case key.Special == KeyBackspace:
-		a.state.HabEditBuf.DeleteChar()
-	case key.Special == KeyDelete:
-		a.state.HabEditBuf.DeleteCharForward()
-	case key.Special == KeyLeft:
-		if a.state.HabEditBuf.Cursor > 0 {
-			a.state.HabEditBuf.Cursor--
-		}
-	case key.Special == KeyRight:
-		if a.state.HabEditBuf.Cursor < len(a.state.HabEditBuf.Data) {
-			a.state.HabEditBuf.Cursor++
-		}
-	case key.Special == KeyWordLeft:
-		a.state.HabEditBuf.WordLeft()
-	case key.Special == KeyWordRight:
-		a.state.HabEditBuf.WordRight()
-	case key.Special == KeyDeleteWord:
-		a.state.HabEditBuf.DeleteWord()
-	case key.Special == KeyHome:
-		a.state.HabEditBuf.Cursor = 0
-	case key.Special == KeyEnd:
-		a.state.HabEditBuf.Cursor = len(a.state.HabEditBuf.Data)
-	case key.Special == KeyKillLine:
-		a.state.HabEditBuf.KillLine()
-	case key.Special == KeyKillBack:
-		a.state.HabEditBuf.KillBack()
-	case key.Char != 0:
-		a.state.HabEditBuf.InsertChar(key.Char)
+	default:
+		a.state.HabEditBuf.HandleKey(key)
 	}
 
 	return false

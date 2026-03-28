@@ -67,7 +67,7 @@ func (s *Store) LoadHabits(t time.Time) (*model.HabitTracker, error) {
 		if currentHabit != "" && line != "" && !strings.HasPrefix(line, "#") {
 			for _, tok := range strings.Split(line, ",") {
 				tok = strings.TrimSpace(tok)
-				if d, err := strconv.Atoi(tok); err == nil && d >= 1 {
+				if d, err := strconv.Atoi(tok); err == nil && d >= 1 && d <= 31 {
 					ht.Done[currentHabit][d] = true
 				}
 			}

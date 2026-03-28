@@ -110,7 +110,6 @@ func (a *App) handleCollectionsAdd(key Key) bool {
 				a.state.StatusMsg = err.Error()
 			} else {
 				a.reloadCollections()
-				// Move cursor to the new collection
 				for i, n := range a.state.ColNames {
 					if n == name {
 						a.state.ColCursor = i
@@ -122,34 +121,8 @@ func (a *App) handleCollectionsAdd(key Key) bool {
 		a.state.ColAdding = false
 		a.state.ColEditBuf.Clear()
 
-	case key.Special == KeyBackspace:
-		a.state.ColEditBuf.DeleteChar()
-	case key.Special == KeyDelete:
-		a.state.ColEditBuf.DeleteCharForward()
-	case key.Special == KeyLeft:
-		if a.state.ColEditBuf.Cursor > 0 {
-			a.state.ColEditBuf.Cursor--
-		}
-	case key.Special == KeyRight:
-		if a.state.ColEditBuf.Cursor < len(a.state.ColEditBuf.Data) {
-			a.state.ColEditBuf.Cursor++
-		}
-	case key.Special == KeyWordLeft:
-		a.state.ColEditBuf.WordLeft()
-	case key.Special == KeyWordRight:
-		a.state.ColEditBuf.WordRight()
-	case key.Special == KeyDeleteWord:
-		a.state.ColEditBuf.DeleteWord()
-	case key.Special == KeyHome:
-		a.state.ColEditBuf.Cursor = 0
-	case key.Special == KeyEnd:
-		a.state.ColEditBuf.Cursor = len(a.state.ColEditBuf.Data)
-	case key.Special == KeyKillLine:
-		a.state.ColEditBuf.KillLine()
-	case key.Special == KeyKillBack:
-		a.state.ColEditBuf.KillBack()
-	case key.Char != 0:
-		a.state.ColEditBuf.InsertChar(key.Char)
+	default:
+		a.state.ColEditBuf.HandleKey(key)
 	}
 
 	return false
@@ -294,7 +267,6 @@ func (a *App) handleCollectionEdit(key Key) bool {
 		text := a.state.ColEditBuf.String()
 		if text != "" {
 			if a.state.ColEditIdx < 0 {
-				// Add new item
 				if err := a.colSvc.AddItem(a.state.ColName, text); err != nil {
 					a.state.StatusMsg = err.Error()
 				} else {
@@ -302,7 +274,6 @@ func (a *App) handleCollectionEdit(key Key) bool {
 					a.state.ColItemCursor = len(a.state.ColItems) - 1
 				}
 			} else {
-				// Edit existing item
 				if err := a.colSvc.EditItem(a.state.ColName, a.state.ColEditIdx, text); err != nil {
 					a.state.StatusMsg = err.Error()
 				} else {
@@ -313,34 +284,8 @@ func (a *App) handleCollectionEdit(key Key) bool {
 		a.state.ColEditing = false
 		a.state.ColEditBuf.Clear()
 
-	case key.Special == KeyBackspace:
-		a.state.ColEditBuf.DeleteChar()
-	case key.Special == KeyDelete:
-		a.state.ColEditBuf.DeleteCharForward()
-	case key.Special == KeyLeft:
-		if a.state.ColEditBuf.Cursor > 0 {
-			a.state.ColEditBuf.Cursor--
-		}
-	case key.Special == KeyRight:
-		if a.state.ColEditBuf.Cursor < len(a.state.ColEditBuf.Data) {
-			a.state.ColEditBuf.Cursor++
-		}
-	case key.Special == KeyWordLeft:
-		a.state.ColEditBuf.WordLeft()
-	case key.Special == KeyWordRight:
-		a.state.ColEditBuf.WordRight()
-	case key.Special == KeyDeleteWord:
-		a.state.ColEditBuf.DeleteWord()
-	case key.Special == KeyHome:
-		a.state.ColEditBuf.Cursor = 0
-	case key.Special == KeyEnd:
-		a.state.ColEditBuf.Cursor = len(a.state.ColEditBuf.Data)
-	case key.Special == KeyKillLine:
-		a.state.ColEditBuf.KillLine()
-	case key.Special == KeyKillBack:
-		a.state.ColEditBuf.KillBack()
-	case key.Char != 0:
-		a.state.ColEditBuf.InsertChar(key.Char)
+	default:
+		a.state.ColEditBuf.HandleKey(key)
 	}
 
 	return false
