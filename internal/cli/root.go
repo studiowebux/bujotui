@@ -161,7 +161,8 @@ func runTUI(configDir, dataDir string, _, stderr io.Writer) int {
 	}
 	svc := service.NewEntryService(store, cfg)
 	colSvc := service.NewCollectionService(store)
-	app := tui.New(svc, colSvc, cfg)
+	habSvc := service.NewHabitService(store)
+	app := tui.New(svc, colSvc, habSvc, cfg)
 	if err := app.Run(); err != nil {
 		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1

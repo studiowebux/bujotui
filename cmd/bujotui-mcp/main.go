@@ -58,7 +58,8 @@ func main() {
 
 	svc := service.NewEntryService(store, cfg)
 	colSvc := service.NewCollectionService(store)
-	handler := mcp.NewHandler(svc, colSvc)
+	habSvc := service.NewHabitService(store)
+	handler := mcp.NewHandler(svc, colSvc, habSvc)
 	transport := mcp.NewTransport(os.Stdin, os.Stdout)
 
 	log.Printf("starting bujotui MCP server %s", version)

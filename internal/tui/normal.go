@@ -176,6 +176,9 @@ func (a *App) handleNormalKey(key Key) bool {
 
 	case key.Char == 'I':
 		a.enterIndex()
+
+	case key.Char == 'h':
+		a.enterHabit()
 	}
 
 	return false

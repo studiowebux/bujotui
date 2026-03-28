@@ -157,6 +157,8 @@ func (s *EntryService) ResetState(date time.Time, index int) error {
 
 	entry := entries[index]
 	entry.State = ""
+	entry.MigratedTo = ""
+	entry.MigratedFrom = ""
 
 	if err := s.store.UpdateEntry(date, index, entry); err != nil {
 		return fmt.Errorf("reset state: %w", err)

@@ -184,6 +184,63 @@ func ToolList() ToolsListResult {
 					"required": ["name", "index"]
 				}`),
 			},
+			{
+				Name:        "list_habits",
+				Description: "List habit names for a month.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"month": {"type": "string", "description": "Month in YYYY-MM format (default: current month)"}
+					}
+				}`),
+			},
+			{
+				Name:        "add_habit",
+				Description: "Add a new habit to track for a month.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"month": {"type": "string", "description": "Month in YYYY-MM format (default: current month)"},
+						"name":  {"type": "string", "description": "Habit name"}
+					},
+					"required": ["name"]
+				}`),
+			},
+			{
+				Name:        "remove_habit",
+				Description: "Remove a habit from a month.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"month": {"type": "string", "description": "Month in YYYY-MM format (default: current month)"},
+						"name":  {"type": "string", "description": "Habit name"}
+					},
+					"required": ["name"]
+				}`),
+			},
+			{
+				Name:        "toggle_habit",
+				Description: "Toggle a habit's completion for a specific day.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"month": {"type": "string", "description": "Month in YYYY-MM format (default: current month)"},
+						"name":  {"type": "string", "description": "Habit name"},
+						"day":   {"type": "integer", "description": "Day of month (1-31)"}
+					},
+					"required": ["name", "day"]
+				}`),
+			},
+			{
+				Name:        "get_habits_month",
+				Description: "Get full habit tracker data for a month including completions and streaks.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"month": {"type": "string", "description": "Month in YYYY-MM format (default: current month)"}
+					}
+				}`),
+			},
 		},
 	}
 }

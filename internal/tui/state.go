@@ -21,6 +21,7 @@ const (
 	ModeCollections  // list of collections
 	ModeCollection   // viewing/editing a single collection
 	ModeIndex        // searchable index of collections/projects
+	ModeHabit        // habit tracker grid
 )
 
 // ViewState holds all view-layer state. This never leaks into model or data.
@@ -76,6 +77,15 @@ type ViewState struct {
 	ColEditIdx    int  // -1 for add, >=0 for edit
 	ColAdding     bool // true when creating a new collection
 	ColConfirm    bool // true when confirming a delete
+
+	// Habit state
+	HabMonth    time.Time           // first day of displayed month
+	HabTracker  *HabitViewData      // loaded habit data
+	HabRow      int                 // cursor row (habit index)
+	HabCol      int                 // cursor col (day, 0-based = day 1)
+	HabAdding   bool                // adding a new habit
+	HabEditBuf  EditBuffer
+	HabConfirm  bool                // confirming a delete
 
 	// Index state
 	IdxEntries    []IndexEntry // all index entries
@@ -222,6 +232,14 @@ type ColViewItem struct {
 type IndexEntry struct {
 	Kind string // "collection" or "project"
 	Name string
+}
+
+// HabitViewData holds habit data for TUI display.
+type HabitViewData struct {
+	Habits  []string              // habit names
+	Done    map[string]map[int]bool // habit -> day -> done
+	NumDays int                   // days in month
+	Streaks map[string]int        // habit -> current streak
 }
 
 // AcceptCompletion replaces the current token with the selected completion.

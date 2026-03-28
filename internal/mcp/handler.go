@@ -9,14 +9,15 @@ import (
 	"github.com/studiowebux/bujotui/internal/service"
 )
 
-// Handler dispatches MCP tool calls to the EntryService and CollectionService.
+// Handler dispatches MCP tool calls to the EntryService, CollectionService, and HabitService.
 type Handler struct {
 	svc    *service.EntryService
 	colSvc *service.CollectionService
+	habSvc *service.HabitService
 }
 
-func NewHandler(svc *service.EntryService, colSvc *service.CollectionService) *Handler {
-	return &Handler{svc: svc, colSvc: colSvc}
+func NewHandler(svc *service.EntryService, colSvc *service.CollectionService, habSvc *service.HabitService) *Handler {
+	return &Handler{svc: svc, colSvc: colSvc, habSvc: habSvc}
 }
 
 func (h *Handler) HandleToolCall(name string, args json.RawMessage) ToolResult {
@@ -51,6 +52,16 @@ func (h *Handler) HandleToolCall(name string, args json.RawMessage) ToolResult {
 		return h.removeCollectionItem(args)
 	case "toggle_collection_item":
 		return h.toggleCollectionItem(args)
+	case "list_habits":
+		return h.listHabits(args)
+	case "add_habit":
+		return h.addHabit(args)
+	case "remove_habit":
+		return h.removeHabit(args)
+	case "toggle_habit":
+		return h.toggleHabit(args)
+	case "get_habits_month":
+		return h.getHabitsMonth(args)
 	default:
 		return ErrorResult("unknown tool: %s", name)
 	}
@@ -435,6 +446,153 @@ func (h *Handler) removeCollectionItem(args json.RawMessage) ToolResult {
 		return ErrorResult("%v", err)
 	}
 	return TextResult(fmt.Sprintf("Removed item %d from %s", p.Index, p.Name))
+}
+
+func (h *Handler) listHabits(args json.RawMessage) ToolResult {
+	var p struct {
+		Month string `json:"month"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	month, err := parseMonth(p.Month)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	ht, err := h.habSvc.LoadMonth(month)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	if len(ht.Habits) == 0 {
+		return TextResult("No habits for " + month.Format("January 2006"))
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Habits for %s:\n\n", month.Format("January 2006"))
+	for _, name := range ht.Habits {
+		fmt.Fprintf(&b, "- %s\n", name)
+	}
+	return TextResult(b.String())
+}
+
+func (h *Handler) addHabit(args json.RawMessage) ToolResult {
+	var p struct {
+		Month string `json:"month"`
+		Name  string `json:"name"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	month, err := parseMonth(p.Month)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	if err := h.habSvc.AddHabit(month, p.Name); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Added habit: %s", p.Name))
+}
+
+func (h *Handler) removeHabit(args json.RawMessage) ToolResult {
+	var p struct {
+		Month string `json:"month"`
+		Name  string `json:"name"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	month, err := parseMonth(p.Month)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	if err := h.habSvc.RemoveHabit(month, p.Name); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Removed habit: %s", p.Name))
+}
+
+func (h *Handler) toggleHabit(args json.RawMessage) ToolResult {
+	var p struct {
+		Month string `json:"month"`
+		Name  string `json:"name"`
+		Day   int    `json:"day"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	month, err := parseMonth(p.Month)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	if err := h.habSvc.Toggle(month, p.Name, p.Day); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Toggled %s on day %d", p.Name, p.Day))
+}
+
+func (h *Handler) getHabitsMonth(args json.RawMessage) ToolResult {
+	var p struct {
+		Month string `json:"month"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	month, err := parseMonth(p.Month)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	ht, err := h.habSvc.LoadMonth(month)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	if len(ht.Habits) == 0 {
+		return TextResult("No habits for " + month.Format("January 2006"))
+	}
+
+	numDays := time.Date(month.Year(), month.Month()+1, 0, 0, 0, 0, 0, month.Location()).Day()
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Habits for %s:\n\n", month.Format("January 2006"))
+	for _, name := range ht.Habits {
+		fmt.Fprintf(&b, "## %s\n", name)
+		var days []string
+		for d := 1; d <= numDays; d++ {
+			if ht.IsDone(name, d) {
+				days = append(days, fmt.Sprintf("%d", d))
+			}
+		}
+		if len(days) > 0 {
+			fmt.Fprintf(&b, "Done: %s\n", strings.Join(days, ", "))
+		} else {
+			b.WriteString("No completions\n")
+		}
+		fmt.Fprintf(&b, "Streak: %d\n\n", ht.Streak(name, numDays))
+	}
+	return TextResult(b.String())
+}
+
+func parseMonth(s string) (time.Time, error) {
+	if s == "" {
+		now := time.Now()
+		return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()), nil
+	}
+	t, err := time.ParseInLocation("2006-01", s, time.Local)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid month format (expected YYYY-MM): %v", err)
+	}
+	return t, nil
 }
 
 func (h *Handler) toggleCollectionItem(args json.RawMessage) ToolResult {
