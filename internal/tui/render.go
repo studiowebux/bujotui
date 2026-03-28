@@ -40,6 +40,18 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 		renderCalendar(w, vs)
 		return
 	}
+	if vs.Mode == ModeCollections {
+		renderCollections(w, vs)
+		return
+	}
+	if vs.Mode == ModeCollection {
+		renderCollectionView(w, vs)
+		return
+	}
+	if vs.Mode == ModeIndex {
+		renderIndex(w, vs)
+		return
+	}
 
 	term.MoveCursor(w, 1, 1)
 
@@ -146,7 +158,7 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 	case ModeFilter:
 		renderInput(w, vs)
 	case ModeConfirm:
-		fmt.Fprintf(w, " %s%s%s %s(y/n)%s", term.Bold+term.FgRed, vs.ConfirmMsg, term.Reset, term.FgGray, term.Reset)
+		renderConfirmPrompt(w, vs.ConfirmMsg)
 	case ModeHelp:
 		renderHelpBar(w, width)
 	case ModeForm:
@@ -175,6 +187,8 @@ func renderHelpBar(w io.Writer, width int) {
 		{"t", "time"},
 		{"/", "filter"},
 		{"m", "calendar"},
+		{"p", "collections"},
+		{"I", "index"},
 		{"?", "help"},
 		{"q", "quit"},
 	}
@@ -818,6 +832,8 @@ func renderHelpScreen(w io.Writer, vs *ViewState) {
 		mkKey("[ ]", "Previous/next day"),
 		mkKey("t", "Toggle time display"),
 		mkKey("m", "Calendar view"),
+		mkKey("p", "Collections"),
+		mkKey("I", "Index"),
 		mkKey("q", "Quit"),
 		mkEmpty(),
 		mkSection("STATE TRANSITIONS"),
@@ -925,6 +941,11 @@ func renderInput(w io.Writer, vs *ViewState) {
 	// Restore cursor to saved position (right at Input.Cursor in the input line)
 	fmt.Fprint(w, "\x1b[u")
 	term.ShowCursor(w)
+}
+
+// renderConfirmPrompt draws a "(y/n)" confirmation prompt with the given message.
+func renderConfirmPrompt(w io.Writer, msg string) {
+	fmt.Fprintf(w, " %s%s%s %s(y/n)%s", term.Bold+term.FgRed, msg, term.Reset, term.FgGray, term.Reset)
 }
 
 // displayWidth returns the visible width of a string (ASCII-only approximation).

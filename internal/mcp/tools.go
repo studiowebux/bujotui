@@ -107,6 +107,83 @@ func ToolList() ToolsListResult {
 					"required": ["query"]
 				}`),
 			},
+			{
+				Name:        "list_collections",
+				Description: "List all collection names.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {}
+				}`),
+			},
+			{
+				Name:        "get_collection",
+				Description: "Get a collection's items by name.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"name": {"type": "string", "description": "Collection name"}
+					},
+					"required": ["name"]
+				}`),
+			},
+			{
+				Name:        "create_collection",
+				Description: "Create a new empty collection.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"name": {"type": "string", "description": "Collection name"}
+					},
+					"required": ["name"]
+				}`),
+			},
+			{
+				Name:        "delete_collection",
+				Description: "Delete a collection.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"name": {"type": "string", "description": "Collection name"}
+					},
+					"required": ["name"]
+				}`),
+			},
+			{
+				Name:        "add_collection_item",
+				Description: "Add an item to a collection.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"name": {"type": "string", "description": "Collection name"},
+						"text": {"type": "string", "description": "Item text"}
+					},
+					"required": ["name", "text"]
+				}`),
+			},
+			{
+				Name:        "remove_collection_item",
+				Description: "Remove an item from a collection by index (0-based).",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"name":  {"type": "string", "description": "Collection name"},
+						"index": {"type": "integer", "description": "Item index (0-based)"}
+					},
+					"required": ["name", "index"]
+				}`),
+			},
+			{
+				Name:        "toggle_collection_item",
+				Description: "Toggle the done state of a collection item.",
+				InputSchema: json.RawMessage(`{
+					"type": "object",
+					"properties": {
+						"name":  {"type": "string", "description": "Collection name"},
+						"index": {"type": "integer", "description": "Item index (0-based)"}
+					},
+					"required": ["name", "index"]
+				}`),
+			},
 		},
 	}
 }

@@ -149,6 +149,12 @@ func (a *App) handleNormalKey(key Key) bool {
 
 	case key.Char == 'm':
 		a.enterCalendar()
+
+	case key.Char == 'p':
+		a.enterCollections()
+
+	case key.Char == 'I':
+		a.enterIndex()
 	}
 
 	return false

@@ -18,8 +18,9 @@ import (
 
 // App is the main TUI application.
 type App struct {
-	svc       *service.EntryService
-	cfg       *config.Config
+	svc    *service.EntryService
+	colSvc *service.CollectionService
+	cfg    *config.Config
 	completer *complete.Completer
 
 	state         *ViewState
@@ -35,7 +36,7 @@ type App struct {
 }
 
 // New creates a new TUI App.
-func New(svc *service.EntryService, cfg *config.Config) *App {
+func New(svc *service.EntryService, colSvc *service.CollectionService, cfg *config.Config) *App {
 	comp := complete.New(
 		cfg.Symbols.SymbolNames(),
 		cfg.Projects,
@@ -43,8 +44,9 @@ func New(svc *service.EntryService, cfg *config.Config) *App {
 	)
 
 	return &App{
-		svc:       svc,
-		cfg:       cfg,
+		svc:    svc,
+		colSvc: colSvc,
+		cfg:    cfg,
 		completer: comp,
 		state:     NewViewState(cfg),
 		date:      time.Now(),
@@ -137,6 +139,12 @@ func (a *App) handleKey(key Key) bool {
 		return a.handleMigrateKey(key)
 	case ModeCalendar:
 		return a.handleCalendarKey(key)
+	case ModeCollections:
+		return a.handleCollectionsKey(key)
+	case ModeCollection:
+		return a.handleCollectionKey(key)
+	case ModeIndex:
+		return a.handleIndexKey(key)
 	}
 	return false
 }

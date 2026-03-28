@@ -9,13 +9,14 @@ import (
 	"github.com/studiowebux/bujotui/internal/service"
 )
 
-// Handler dispatches MCP tool calls to the EntryService.
+// Handler dispatches MCP tool calls to the EntryService and CollectionService.
 type Handler struct {
-	svc *service.EntryService
+	svc    *service.EntryService
+	colSvc *service.CollectionService
 }
 
-func NewHandler(svc *service.EntryService) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *service.EntryService, colSvc *service.CollectionService) *Handler {
+	return &Handler{svc: svc, colSvc: colSvc}
 }
 
 func (h *Handler) HandleToolCall(name string, args json.RawMessage) ToolResult {
@@ -36,6 +37,20 @@ func (h *Handler) HandleToolCall(name string, args json.RawMessage) ToolResult {
 		return h.listMonth(args)
 	case "search":
 		return h.search(args)
+	case "list_collections":
+		return h.listCollections(args)
+	case "get_collection":
+		return h.getCollection(args)
+	case "create_collection":
+		return h.createCollection(args)
+	case "delete_collection":
+		return h.deleteCollection(args)
+	case "add_collection_item":
+		return h.addCollectionItem(args)
+	case "remove_collection_item":
+		return h.removeCollectionItem(args)
+	case "toggle_collection_item":
+		return h.toggleCollectionItem(args)
 	default:
 		return ErrorResult("unknown tool: %s", name)
 	}
@@ -314,6 +329,127 @@ func (h *Handler) search(args json.RawMessage) ToolResult {
 	}
 	fmt.Fprintf(&b, "Found %d matching entries.", found)
 	return TextResult(b.String())
+}
+
+func (h *Handler) listCollections(_ json.RawMessage) ToolResult {
+	names, err := h.colSvc.List()
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+	if len(names) == 0 {
+		return TextResult("No collections.")
+	}
+	var b strings.Builder
+	b.WriteString("Collections:\n\n")
+	for _, n := range names {
+		fmt.Fprintf(&b, "- %s\n", n)
+	}
+	return TextResult(b.String())
+}
+
+func (h *Handler) getCollection(args json.RawMessage) ToolResult {
+	var p struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+	if p.Name == "" {
+		return ErrorResult("name is required")
+	}
+
+	col, err := h.colSvc.Get(p.Name)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "# %s\n\n", col.Name)
+	for i, item := range col.Items {
+		check := "[ ]"
+		if item.Done {
+			check = "[x]"
+		}
+		fmt.Fprintf(&b, "%d. %s %s\n", i, check, item.Text)
+	}
+	if len(col.Items) == 0 {
+		b.WriteString("(empty)\n")
+	}
+	return TextResult(b.String())
+}
+
+func (h *Handler) createCollection(args json.RawMessage) ToolResult {
+	var p struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	col, err := h.colSvc.Create(p.Name)
+	if err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Created collection: %s", col.Name))
+}
+
+func (h *Handler) deleteCollection(args json.RawMessage) ToolResult {
+	var p struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	if err := h.colSvc.Delete(p.Name); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Deleted collection: %s", p.Name))
+}
+
+func (h *Handler) addCollectionItem(args json.RawMessage) ToolResult {
+	var p struct {
+		Name string `json:"name"`
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	if err := h.colSvc.AddItem(p.Name, p.Text); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Added item to %s: %s", p.Name, p.Text))
+}
+
+func (h *Handler) removeCollectionItem(args json.RawMessage) ToolResult {
+	var p struct {
+		Name  string `json:"name"`
+		Index int    `json:"index"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	if err := h.colSvc.RemoveItem(p.Name, p.Index); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Removed item %d from %s", p.Index, p.Name))
+}
+
+func (h *Handler) toggleCollectionItem(args json.RawMessage) ToolResult {
+	var p struct {
+		Name  string `json:"name"`
+		Index int    `json:"index"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return ErrorResult("invalid arguments: %v", err)
+	}
+
+	if err := h.colSvc.ToggleItem(p.Name, p.Index); err != nil {
+		return ErrorResult("%v", err)
+	}
+	return TextResult(fmt.Sprintf("Toggled item %d in %s", p.Index, p.Name))
 }
 
 func parseDate(s string) (time.Time, error) {

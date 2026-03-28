@@ -18,6 +18,9 @@ const (
 	ModeForm         // multi-field form for add/edit
 	ModeMigrate      // picking a target date for migration
 	ModeCalendar     // monthly calendar view
+	ModeCollections  // list of collections
+	ModeCollection   // viewing/editing a single collection
+	ModeIndex        // searchable index of collections/projects
 )
 
 // ViewState holds all view-layer state. This never leaks into model or data.
@@ -59,6 +62,28 @@ type ViewState struct {
 	CalNotes    map[int]string        // day number -> daily note
 	CalEditing  bool                  // true when editing the note
 	CalNoteBuf  EditBuffer            // note edit buffer
+
+	// Collections state
+	ColNames      []string // list of collection names
+	ColCursor     int      // cursor in collection list
+	ColScroll     int      // scroll offset for collection list
+	ColName       string   // name of currently viewed collection
+	ColItems      []ColViewItem // items in current collection
+	ColItemCursor int      // cursor in item list
+	ColItemScroll int      // scroll offset for item list
+	ColEditing    bool     // true when adding/editing an item
+	ColEditBuf    EditBuffer
+	ColEditIdx    int  // -1 for add, >=0 for edit
+	ColAdding     bool // true when creating a new collection
+	ColConfirm    bool // true when confirming a delete
+
+	// Index state
+	IdxEntries    []IndexEntry // all index entries
+	IdxFiltered   []int        // indices into IdxEntries matching filter
+	IdxCursor     int
+	IdxScroll     int
+	IdxFilterBuf  EditBuffer
+	IdxFiltering  bool // true when typing in filter
 
 	// Status message (shown for one frame after an action)
 	StatusMsg string
@@ -185,6 +210,18 @@ func (f *Form) FieldValue(fieldType string) string {
 		}
 	}
 	return ""
+}
+
+// ColViewItem wraps a collection item for display.
+type ColViewItem struct {
+	Text string
+	Done bool
+}
+
+// IndexEntry represents one item in the index view.
+type IndexEntry struct {
+	Kind string // "collection" or "project"
+	Name string
 }
 
 // AcceptCompletion replaces the current token with the selected completion.
