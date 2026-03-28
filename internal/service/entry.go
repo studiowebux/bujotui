@@ -164,6 +164,55 @@ func (s *EntryService) ResetState(date time.Time, index int) error {
 	return nil
 }
 
+// MigrateEntry copies the entry at index on sourceDate to targetDate,
+// then marks the original as migrated.
+func (s *EntryService) MigrateEntry(sourceDate time.Time, index int, targetDate time.Time) error {
+	entries, err := s.store.LoadDay(sourceDate)
+	if err != nil {
+		return fmt.Errorf("load source day: %w", err)
+	}
+	if index < 0 || index >= len(entries) {
+		return fmt.Errorf("entry index %d out of range (0-%d)", index, len(entries)-1)
+	}
+
+	entry := entries[index]
+
+	if entry.State == "migrated" {
+		return fmt.Errorf("entry is already migrated")
+	}
+
+	src := time.Date(sourceDate.Year(), sourceDate.Month(), sourceDate.Day(), 0, 0, 0, 0, sourceDate.Location())
+	tgt := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, targetDate.Location())
+	if src.Equal(tgt) {
+		return fmt.Errorf("cannot migrate to the same day")
+	}
+
+	if !s.cfg.Symbols.CanTransition(entry.Symbol.Name, "migrated") {
+		return fmt.Errorf("cannot migrate %q entries", entry.Symbol.Name)
+	}
+
+	// Create copy on target date
+	copy := model.Entry{
+		Symbol:      entry.Symbol,
+		State:       "",
+		Project:     entry.Project,
+		Person:      entry.Person,
+		Description: entry.Description,
+		DateTime:    targetDate,
+	}
+	if err := s.store.AddEntry(copy); err != nil {
+		return fmt.Errorf("add migrated copy: %w", err)
+	}
+
+	// Mark original as migrated
+	entry.State = "migrated"
+	if err := s.store.UpdateEntry(sourceDate, index, entry); err != nil {
+		return fmt.Errorf("mark original as migrated: %w", err)
+	}
+
+	return nil
+}
+
 // LoadDay returns all entries for the given date, delegating to the store.
 func (s *EntryService) LoadDay(date time.Time) ([]model.Entry, error) {
 	entries, err := s.store.LoadDay(date)

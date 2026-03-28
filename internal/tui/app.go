@@ -95,7 +95,7 @@ func (a *App) Run() error {
 
 	buf := make([]byte, 64)
 	for {
-		n, err := syscall.Read(int(a.ttyFd), buf)
+		n, err := syscall.Read(int(a.ttyFd), buf) // #nosec G115 -- ttyFd is a valid file descriptor
 		if err != nil {
 			// SIGWINCH interrupts read with EINTR, just retry
 			if err == syscall.EINTR {
@@ -133,6 +133,8 @@ func (a *App) handleKey(key Key) bool {
 		return a.handleHelpKey(key)
 	case ModeForm:
 		return a.handleFormKey(key)
+	case ModeMigrate:
+		return a.handleMigrateKey(key)
 	}
 	return false
 }
@@ -185,15 +187,6 @@ func matchesFilter(e model.Entry, vs *ViewState) bool {
 		vs.FilterProject, vs.FilterPerson, vs.FilterSymbol, vs.FilterText,
 	)
 	return len(filtered) > 0
-}
-
-// realIndex maps a filtered entry index to its position in allDay.
-// Returns -1 if the index is out of range.
-func (a *App) realIndex(filteredIdx int) int {
-	if filteredIdx < 0 || filteredIdx >= len(a.entryIndexMap) {
-		return -1
-	}
-	return a.entryIndexMap[filteredIdx]
 }
 
 // updateSize reads the current terminal dimensions with mutex protection.

@@ -100,8 +100,8 @@ func DefaultDir() string {
 // dataDir specifies where journal data (daily/) is stored.
 // If bujotui.conf does not exist, returns a config with built-in defaults.
 func Load(configDir, dataDir string) (*Config, error) {
-	confPath := filepath.Join(configDir, "bujotui.conf")
-	f, err := os.Open(confPath)
+	confPath := filepath.Clean(filepath.Join(configDir, "bujotui.conf"))
+	f, err := os.Open(confPath) // #nosec G304 -- path is constructed from user-configured config dir
 	if err != nil {
 		if os.IsNotExist(err) {
 			return parseReader(strings.NewReader(DefaultConf), configDir, dataDir)
@@ -114,14 +114,14 @@ func Load(configDir, dataDir string) (*Config, error) {
 
 // Init writes the default config file to the given directory.
 func Init(dir string) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create dir: %w", err)
 	}
 	confPath := filepath.Join(dir, "bujotui.conf")
 	if _, err := os.Stat(confPath); err == nil {
 		return fmt.Errorf("config already exists: %s", confPath)
 	}
-	return os.WriteFile(confPath, []byte(DefaultConf), 0o644)
+	return os.WriteFile(confPath, []byte(DefaultConf), 0o600)
 }
 
 func parseReader(r io.Reader, configDir, dataDir string) (*Config, error) {

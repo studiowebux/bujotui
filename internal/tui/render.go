@@ -31,11 +31,15 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 		renderHelpScreen(w, vs)
 		return
 	}
+	if vs.Mode == ModeMigrate {
+		renderMigrate(w, vs)
+		return
+	}
 
 	term.MoveCursor(w, 1, 1)
 
 	// Header
-	header := fmt.Sprintf(" bujotui")
+	header := " bujotui"
 	dateLabel := fmt.Sprintf("  %s  ", date)
 	nav := "[ prev  ] next "
 	pad := width - len(header) - len(dateLabel) - len(nav)
@@ -274,6 +278,104 @@ func stateColor(vs *ViewState, state string) string {
 
 const ghostFilter = "project:name @person symbol:name text"
 
+func renderMigrate(w io.Writer, vs *ViewState) {
+	width := vs.Width
+	height := vs.Height
+
+	boxW := 44
+	if boxW > width-4 {
+		boxW = width - 4
+	}
+
+	bg := term.BgDarkGray + term.FgWhite
+	hi := term.BgDarkGray + term.Bold + term.FgCyan
+	dim := term.BgDarkGray + term.FgGray
+	activeLbl := term.BgDarkGray + term.Bold + term.FgWhite
+	activeField := "\x1b[48;5;238m" + term.FgWhite
+
+	boxH := 7 // title + blank + label+field + blank + footer + blank + status
+	startCol := (width - boxW) / 2
+	startRow := (height - boxH) / 2
+	if startCol < 1 {
+		startCol = 1
+	}
+	if startRow < 1 {
+		startRow = 1
+	}
+
+	drawBg := func(row int) {
+		term.MoveCursor(w, row, startCol)
+		fmt.Fprintf(w, "%s%s%s", bg, strings.Repeat(" ", boxW), term.Reset)
+	}
+
+	row := startRow
+
+	// Title
+	drawBg(row)
+	term.MoveCursor(w, row, startCol+2)
+	fmt.Fprintf(w, "%sMIGRATE TO DATE%s", hi, term.Reset)
+	row++
+
+	// Blank
+	drawBg(row)
+	row++
+
+	// Date field
+	labelW := 12
+	fieldW := boxW - labelW - 4
+	if fieldW < 10 {
+		fieldW = 10
+	}
+
+	val := vs.MigrateDate.String()
+	cursor := vs.MigrateDate.Cursor
+	scrollOffset := 0
+	if cursor > fieldW-1 {
+		scrollOffset = cursor - fieldW + 1
+	}
+	dispVal := val
+	if scrollOffset > 0 && scrollOffset < len(dispVal) {
+		dispVal = dispVal[scrollOffset:]
+	}
+	if len(dispVal) > fieldW {
+		dispVal = dispVal[:fieldW]
+	}
+	valPad := fieldW - len(dispVal)
+	if valPad < 0 {
+		valPad = 0
+	}
+
+	fieldCol := startCol + 2 + labelW
+	rightPad := boxW - 2 - labelW - fieldW
+	if rightPad < 0 {
+		rightPad = 0
+	}
+	term.MoveCursor(w, row, startCol)
+	label := fmt.Sprintf("%-12s", "Date:")
+	fmt.Fprintf(w, "%s  %s%s%s%s%s%s%s%s",
+		bg, activeLbl, label, bg,
+		activeField, dispVal, strings.Repeat(" ", valPad),
+		bg, strings.Repeat(" ", rightPad)+term.Reset)
+	row++
+
+	// Blank
+	drawBg(row)
+	row++
+
+	// Footer
+	drawBg(row)
+	term.MoveCursor(w, row, startCol+2)
+	fmt.Fprintf(w, "%sEnter:migrate  Esc:cancel%s", dim, term.Reset)
+	row++
+
+	// Bottom blank
+	drawBg(row)
+
+	// Cursor
+	term.MoveCursor(w, startRow+2, fieldCol+cursor-scrollOffset)
+	term.ShowCursor(w)
+}
+
 // inputGhost returns ghost placeholder text for the current input mode.
 func inputGhost(input string, mode Mode) string {
 	if mode == ModeFilter && input == "" {
@@ -305,20 +407,10 @@ func renderForm(w io.Writer, vs *ViewState) {
 		fieldW = 10
 	}
 
-	// Calculate box height
-	boxH := 5 // title + blank + blank + footer + blank
-	for range form.Fields {
-		boxH++ // one row per field
-	}
-	// Completions
-	if len(vs.Completions) > 0 {
-		n := len(vs.Completions)
-		if n > 6 {
-			n = 7 // 6 + "more" line
-		}
-		boxH += n
-	}
-
+	// Calculate box height — always reserve max space for completions
+	// to avoid stale content when completions appear/disappear
+	maxCompletions := 7 // 6 visible + "more" line
+	boxH := 5 + len(form.Fields) + maxCompletions
 	if boxH > height-2 {
 		boxH = height - 2
 	}
@@ -444,8 +536,12 @@ func renderForm(w io.Writer, vs *ViewState) {
 	fmt.Fprintf(w, "%sTab:next  S-Tab:prev  Enter:ok  Esc:cancel%s", dim, term.Reset)
 	row++
 
-	// Bottom blank
-	drawBg(row)
+	// Fill remaining rows to clear stale content
+	endRow := startRow + boxH
+	for row <= endRow {
+		drawBg(row)
+		row++
+	}
 
 	// Position cursor
 	if cursorRow > 0 {

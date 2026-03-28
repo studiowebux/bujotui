@@ -21,7 +21,7 @@ type Store struct {
 // NewStore creates a Store and ensures required directories exist.
 func NewStore(cfg *config.Config) (*Store, error) {
 	dailyDir := filepath.Join(cfg.DataDir, "daily")
-	if err := os.MkdirAll(dailyDir, 0o755); err != nil {
+	if err := os.MkdirAll(dailyDir, 0o750); err != nil {
 		return nil, fmt.Errorf("create daily dir: %w", err)
 	}
 	return &Store{Dir: cfg.DataDir, Config: cfg}, nil
@@ -34,8 +34,8 @@ func (s *Store) MonthFile(t time.Time) string {
 
 // LoadMonth reads and parses the monthly file. Returns empty slice if file doesn't exist.
 func (s *Store) LoadMonth(t time.Time) ([]model.DayLog, error) {
-	path := s.MonthFile(t)
-	f, err := os.Open(path)
+	path := filepath.Clean(s.MonthFile(t))
+	f, err := os.Open(path) // #nosec G304 -- path is constructed from user-configured data dir
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil

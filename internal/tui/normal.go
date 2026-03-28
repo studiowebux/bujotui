@@ -76,11 +76,10 @@ func (a *App) handleNormalKey(key Key) bool {
 	case key.Char == '>':
 		if len(a.entries) > 0 && a.state.Cursor < len(a.entries) {
 			realIdx := a.entryIndexMap[a.state.Cursor]
-			if err := a.svc.TransitionEntry(a.date, realIdx, "migrated"); err != nil {
-				a.state.StatusMsg = err.Error()
-				return false
-			}
-			a.loadEntries()
+			tomorrow := a.date.AddDate(0, 0, 1).Format("2006-01-02")
+			a.state.Mode = ModeMigrate
+			a.state.MigrateIndex = realIdx
+			a.state.MigrateDate.Set(tomorrow)
 		}
 
 	case key.Char == '<':

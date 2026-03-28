@@ -14,6 +14,7 @@ const (
 	ModeConfirm      // confirming a delete
 	ModeHelp         // showing help screen
 	ModeForm         // multi-field form for add/edit
+	ModeMigrate      // picking a target date for migration
 )
 
 // ViewState holds all view-layer state. This never leaks into model or data.
@@ -43,6 +44,10 @@ type ViewState struct {
 	// Confirm state
 	ConfirmMsg   string
 	ConfirmIndex int // entry index to act on
+
+	// Migrate state
+	MigrateIndex int        // real allDay index of entry to migrate
+	MigrateDate  EditBuffer // target date input
 
 	// Status message (shown for one frame after an action)
 	StatusMsg string

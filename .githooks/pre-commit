@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+
+echo "Running pre-commit checks..."
+
+echo "  go build..."
+go build ./cmd/bujotui/...
+
+echo "  go test -race..."
+go test -count=1 -race ./...
+
+echo "  go vet..."
+go vet ./...
+
+if command -v staticcheck >/dev/null 2>&1; then
+    echo "  staticcheck..."
+    staticcheck ./...
+else
+    echo "  staticcheck... SKIPPED (not installed: go install honnef.co/go/tools/cmd/staticcheck@latest)"
+fi
+
+if command -v gosec >/dev/null 2>&1; then
+    echo "  gosec..."
+    gosec -severity medium -quiet ./...
+else
+    echo "  gosec... SKIPPED (not installed: go install github.com/securego/gosec/v2/cmd/gosec@latest)"
+fi
+
+if command -v govulncheck >/dev/null 2>&1; then
+    echo "  govulncheck..."
+    govulncheck ./...
+else
+    echo "  govulncheck... SKIPPED (not installed: go install golang.org/x/vuln/cmd/govulncheck@latest)"
+fi
+
+echo "All checks passed."
