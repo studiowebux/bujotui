@@ -46,7 +46,14 @@ func ParseFile(r io.Reader, symbols *model.SymbolSet) ([]model.DayLog, error) {
 			// Not a valid date heading — treat as raw line
 		}
 
-		// Entry line: - • 2026-03-27T14:30 [project] @person description
+		// Daily note: > free text
+		if current != nil && strings.HasPrefix(trimmed, "> ") {
+			current.Note = trimmed[2:]
+			current.Raw = append(current.Raw, model.RawLine{IsEntry: false, Text: line})
+			continue
+		}
+
+		// Entry line: - symbol 2026-03-27T14:30 [project] @person description
 		if current != nil && strings.HasPrefix(trimmed, entryPrefix) {
 			entry, ok := ParseEntryLine(trimmed, symbols)
 			if ok {

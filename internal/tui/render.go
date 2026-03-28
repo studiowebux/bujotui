@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/studiowebux/bujotui/internal/model"
 	"github.com/studiowebux/bujotui/internal/term"
@@ -33,6 +34,10 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 	}
 	if vs.Mode == ModeMigrate {
 		renderMigrate(w, vs)
+		return
+	}
+	if vs.Mode == ModeCalendar {
+		renderCalendar(w, vs)
 		return
 	}
 
@@ -169,6 +174,7 @@ func renderHelpBar(w io.Writer, width int) {
 		{"d", "del"},
 		{"t", "time"},
 		{"/", "filter"},
+		{"m", "calendar"},
 		{"?", "help"},
 		{"q", "quit"},
 	}
@@ -374,6 +380,219 @@ func renderMigrate(w io.Writer, vs *ViewState) {
 	// Cursor
 	term.MoveCursor(w, startRow+2, fieldCol+cursor-scrollOffset)
 	term.ShowCursor(w)
+}
+
+func renderCalendar(w io.Writer, vs *ViewState) {
+	width := vs.Width
+	height := vs.Height
+	if width < 40 {
+		width = 80
+	}
+	if height < 10 {
+		height = 24
+	}
+
+	term.MoveCursor(w, 1, 1)
+
+	// Header
+	monthLabel := vs.CalMonth.Format("January 2006")
+	header := fmt.Sprintf(" bujotui  %s", monthLabel)
+	nav := "[ prev  ] next  Esc:back  Enter:open "
+	pad := width - len(header) - len(nav)
+	if pad < 1 {
+		pad = 1
+	}
+	fmt.Fprintf(w, "%s%s%s%s%s%s%s",
+		term.Bold+term.FgCyan, header,
+		term.Reset, strings.Repeat(" ", pad),
+		term.FgGray, nav,
+		term.Reset+nl)
+
+	// Separator
+	fmt.Fprintf(w, "%s%s%s%s", term.FgGray, strings.Repeat("─", width), term.Reset, nl)
+
+	// Layout: left panel (day list) | right panel (day detail)
+	leftW := 30
+	rightW := width - leftW - 3 // 3 for " | " separator
+	if rightW < 20 {
+		rightW = 20
+		leftW = width - rightW - 3
+	}
+
+	numDays := daysInMonth(vs.CalMonth)
+	visible := height - 4 // header + separator + bottom separator + help bar
+
+	// Scroll the day list to keep cursor visible
+	scrollOffset := 0
+	if vs.CalCursor >= visible {
+		scrollOffset = vs.CalCursor - visible + 1
+	}
+
+	// Selected day entries for right panel
+	selectedDay := vs.CalCursor + 1
+	selectedEntries := vs.CalEntries[selectedDay]
+
+	cursorRow := 0
+	cursorCol := 0
+
+	for row := 0; row < visible; row++ {
+		dayIdx := scrollOffset + row
+		term.MoveCursor(w, row+3, 1) // row+3 because header(1) + separator(1) + 1-based
+
+		// Left panel: day row with note
+		if dayIdx < numDays {
+			day := dayIdx + 1
+			date := time.Date(vs.CalMonth.Year(), vs.CalMonth.Month(), day, 0, 0, 0, 0, vs.CalMonth.Location())
+			dayName := date.Format("Mon")[:2]
+			entries := vs.CalEntries[day]
+			count := len(entries)
+			note := vs.CalNotes[day]
+
+			// Show note text (or entry count if no note)
+			noteText := note
+			if noteText == "" && count > 0 {
+				noteText = fmt.Sprintf("(%d entries)", count)
+			}
+
+			// If editing this day's note, show the edit buffer
+			isSelected := dayIdx == vs.CalCursor
+			if isSelected && vs.CalEditing {
+				noteText = vs.CalNoteBuf.String()
+			}
+
+			maxNote := leftW - 8 // " DD Da "
+			if maxNote < 0 {
+				maxNote = 0
+			}
+			if len(noteText) > maxNote {
+				noteText = noteText[:maxNote-1] + "~"
+			}
+
+			prefix := fmt.Sprintf(" %02d %s ", day, dayName)
+			padL := leftW - len(prefix) - len(noteText)
+			if padL < 0 {
+				padL = 0
+			}
+
+			if isSelected && vs.CalEditing {
+				// Editing: highlight bg with cursor
+				fmt.Fprintf(w, "%s%s%s%s%s%s%s",
+					term.BgHighlight+term.FgCyan, prefix,
+					term.BgHighlight+term.FgBrightWhite, noteText,
+					strings.Repeat(" ", padL),
+					term.Reset, "")
+				cursorRow = row + 3
+				cursorCol = len(prefix) + vs.CalNoteBuf.Cursor + 1
+				if cursorCol > leftW {
+					cursorCol = leftW
+				}
+			} else if isSelected {
+				fmt.Fprintf(w, "%s%s%s%s%s",
+					term.BgHighlight+term.Bold+term.FgBrightWhite, prefix,
+					noteText, strings.Repeat(" ", padL),
+					term.Reset)
+			} else if note != "" || count > 0 {
+				fmt.Fprintf(w, "%s%s%s%s%s%s%s",
+					term.FgCyan, prefix[:7],
+					term.FgBrightWhite, noteText,
+					strings.Repeat(" ", padL),
+					term.Reset, "")
+			} else {
+				fmt.Fprintf(w, "%s%s%s%s",
+					term.FgGray, prefix,
+					strings.Repeat(" ", leftW-len(prefix)),
+					term.Reset)
+			}
+		} else {
+			fmt.Fprint(w, strings.Repeat(" ", leftW))
+		}
+
+		// Separator
+		fmt.Fprintf(w, " %s│%s ", term.FgGray, term.Reset)
+
+		// Right panel: entries for selected day
+		if row == 0 {
+			// Day header
+			selDate := time.Date(vs.CalMonth.Year(), vs.CalMonth.Month(), selectedDay, 0, 0, 0, 0, vs.CalMonth.Location())
+			dayHeader := selDate.Format("Monday, January 2")
+			if len(dayHeader) > rightW {
+				dayHeader = dayHeader[:rightW]
+			}
+			padR := rightW - len(dayHeader)
+			if padR < 0 {
+				padR = 0
+			}
+			fmt.Fprintf(w, "%s%s%s%s", term.Bold+term.FgCyan, dayHeader, strings.Repeat(" ", padR), term.Reset)
+		} else if row == 1 {
+			// Blank separator
+			fmt.Fprint(w, strings.Repeat(" ", rightW))
+		} else {
+			entryIdx := row - 2
+			if entryIdx < len(selectedEntries) {
+				e := selectedEntries[entryIdx]
+
+				// Status + Symbol + Description, truncated to fit
+				status := ""
+				if e.State != "" {
+					status = e.State + " "
+				}
+				prefix := fmt.Sprintf("%-12s%-10s", status, e.Symbol.Name)
+				desc := e.Description
+				maxDesc := rightW - len(prefix)
+				if maxDesc < 0 {
+					maxDesc = 0
+				}
+				if len(desc) > maxDesc {
+					desc = desc[:maxDesc-1] + "~"
+				}
+				line := prefix + desc
+				padR := rightW - len(line)
+				if padR < 0 {
+					padR = 0
+				}
+
+				sc := stateColor(vs, e.State)
+				fmt.Fprintf(w, "%s%-12s%s%-10s%s%s%s%s",
+					sc, status,
+					term.FgBrightWhite, e.Symbol.Name,
+					term.FgBrightWhite, desc,
+					strings.Repeat(" ", padR),
+					term.Reset)
+			} else {
+				fmt.Fprint(w, strings.Repeat(" ", rightW))
+			}
+		}
+
+		fmt.Fprint(w, nl)
+	}
+
+	// Bottom separator
+	fmt.Fprintf(w, "%s%s%s%s", term.FgGray, strings.Repeat("─", width), term.Reset, nl)
+
+	// Help bar
+	if vs.CalEditing {
+		fmt.Fprintf(w, " %sEditing note:%s Enter:save  Esc:cancel",
+			term.FgCyan, term.Reset)
+	} else {
+		fmt.Fprintf(w, " %sj/k%s move %s|%s %si/n%s edit note %s|%s %sEnter%s open %s|%s %s[%s prev %s]%s next %s|%s %sEsc%s back %s|%s %s?%s help",
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset)
+	}
+
+	// Clear to end
+	fmt.Fprint(w, "\x1b[0J")
+
+	// Position cursor when editing
+	if vs.CalEditing && cursorRow > 0 {
+		term.MoveCursor(w, cursorRow, cursorCol)
+		term.ShowCursor(w)
+	} else {
+		term.HideCursor(w)
+	}
 }
 
 // inputGhost returns ghost placeholder text for the current input mode.
@@ -598,6 +817,7 @@ func renderHelpScreen(w io.Writer, vs *ViewState) {
 		mkKey("/", "Filter entries"),
 		mkKey("[ ]", "Previous/next day"),
 		mkKey("t", "Toggle time display"),
+		mkKey("m", "Calendar view"),
 		mkKey("q", "Quit"),
 		mkEmpty(),
 		mkSection("STATE TRANSITIONS"),

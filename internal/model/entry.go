@@ -21,6 +21,7 @@ type Entry struct {
 // DayLog groups entries under a single date heading.
 type DayLog struct {
 	Date    time.Time // truncated to day
+	Note    string    // free-text daily note (stored as "> note" in markdown)
 	Entries []Entry
 	// Raw holds non-entry lines (blanks, comments) for roundtrip preservation.
 	// Each element is either a raw line string or nil (entry placeholder).

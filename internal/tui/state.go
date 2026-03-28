@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/studiowebux/bujotui/internal/config"
 	"github.com/studiowebux/bujotui/internal/model"
 )
@@ -15,6 +17,7 @@ const (
 	ModeHelp         // showing help screen
 	ModeForm         // multi-field form for add/edit
 	ModeMigrate      // picking a target date for migration
+	ModeCalendar     // monthly calendar view
 )
 
 // ViewState holds all view-layer state. This never leaks into model or data.
@@ -48,6 +51,14 @@ type ViewState struct {
 	// Migrate state
 	MigrateIndex int        // real allDay index of entry to migrate
 	MigrateDate  EditBuffer // target date input
+
+	// Calendar state
+	CalMonth    time.Time             // first day of displayed month
+	CalCursor   int                   // selected day (0-based, 0 = day 1)
+	CalEntries  map[int][]model.Entry // day number -> entries for that day
+	CalNotes    map[int]string        // day number -> daily note
+	CalEditing  bool                  // true when editing the note
+	CalNoteBuf  EditBuffer            // note edit buffer
 
 	// Status message (shown for one frame after an action)
 	StatusMsg string

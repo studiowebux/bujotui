@@ -213,6 +213,91 @@ func (s *EntryService) MigrateEntry(sourceDate time.Time, index int, targetDate 
 	return nil
 }
 
+// SaveNote sets the daily note for a given date.
+func (s *EntryService) SaveNote(date time.Time, note string) error {
+	days, err := s.store.LoadMonth(date)
+	if err != nil {
+		return fmt.Errorf("load month: %w", err)
+	}
+
+	dateStr := date.Format("2006-01-02")
+	found := false
+	for i, d := range days {
+		if d.Date.Format("2006-01-02") == dateStr {
+			days[i].Note = note
+			// Update raw lines: find and replace existing note line, or insert one
+			updated := false
+			for j, rl := range days[i].Raw {
+				if !rl.IsEntry && len(rl.Text) > 1 && strings.HasPrefix(strings.TrimSpace(rl.Text), "> ") {
+					if note != "" {
+						days[i].Raw[j].Text = "> " + note
+					} else {
+						// Remove the note line
+						days[i].Raw = append(days[i].Raw[:j], days[i].Raw[j+1:]...)
+					}
+					updated = true
+					break
+				}
+			}
+			if !updated && note != "" {
+				// Insert note line at the beginning of raw lines
+				noteLine := model.RawLine{IsEntry: false, Text: "> " + note}
+				days[i].Raw = append([]model.RawLine{
+					{IsEntry: false, Text: ""},
+					noteLine,
+				}, days[i].Raw...)
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found && note != "" {
+		// Create a new day with just the note
+		days = append(days, model.DayLog{
+			Date: date,
+			Note: note,
+			Raw: []model.RawLine{
+				{IsEntry: false, Text: ""},
+				{IsEntry: false, Text: "> " + note},
+			},
+		})
+	}
+
+	if err := s.store.SaveMonth(date, days); err != nil {
+		return fmt.Errorf("save note: %w", err)
+	}
+	return nil
+}
+
+// LoadMonthNotes returns a map of day number -> note for the given month.
+func (s *EntryService) LoadMonthNotes(month time.Time) (map[int]string, error) {
+	days, err := s.store.LoadMonth(month)
+	if err != nil {
+		return nil, fmt.Errorf("load month: %w", err)
+	}
+	result := make(map[int]string)
+	for _, d := range days {
+		if d.Note != "" {
+			result[d.Date.Day()] = d.Note
+		}
+	}
+	return result, nil
+}
+
+// LoadMonth returns a map of day number -> entries for the given month.
+func (s *EntryService) LoadMonth(month time.Time) (map[int][]model.Entry, error) {
+	days, err := s.store.LoadMonth(month)
+	if err != nil {
+		return nil, fmt.Errorf("load month: %w", err)
+	}
+	result := make(map[int][]model.Entry)
+	for _, d := range days {
+		result[d.Date.Day()] = d.Entries
+	}
+	return result, nil
+}
+
 // LoadDay returns all entries for the given date, delegating to the store.
 func (s *EntryService) LoadDay(date time.Time) ([]model.Entry, error) {
 	entries, err := s.store.LoadDay(date)

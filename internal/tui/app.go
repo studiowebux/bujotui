@@ -135,6 +135,8 @@ func (a *App) handleKey(key Key) bool {
 		return a.handleFormKey(key)
 	case ModeMigrate:
 		return a.handleMigrateKey(key)
+	case ModeCalendar:
+		return a.handleCalendarKey(key)
 	}
 	return false
 }

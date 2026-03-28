@@ -34,6 +34,9 @@ func FormatFile(days []model.DayLog) []byte {
 		} else {
 			// Fresh entries: no raw lines to preserve
 			b.WriteByte('\n')
+			if day.Note != "" {
+				fmt.Fprintf(&b, "> %s\n", day.Note)
+			}
 			for _, e := range day.Entries {
 				b.WriteString(FormatEntry(e))
 				b.WriteByte('\n')

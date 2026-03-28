@@ -146,6 +146,9 @@ func (a *App) handleNormalKey(key Key) bool {
 
 	case key.Char == '?':
 		a.state.Mode = ModeHelp
+
+	case key.Char == 'm':
+		a.enterCalendar()
 	}
 
 	return false
