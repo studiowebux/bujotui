@@ -20,11 +20,13 @@ Discord: https://discord.gg/BG5Erm9fNv
 
 ```
 bujotui/
-├── cmd/bujotui/        # CLI entry point
+├── cmd/bujotui/        # TUI + CLI entry point
+├── cmd/bujotui-mcp/    # MCP server entry point
 ├── internal/
 │   ├── cli/            # CLI command handlers
 │   ├── complete/       # Autocomplete engine
 │   ├── config/         # Configuration parsing (XDG-aware)
+│   ├── mcp/            # MCP protocol, tools, and handler
 │   ├── markdown/       # Markdown file format (read/write)
 │   ├── model/          # Domain types (Entry, Symbol, SymbolSet)
 │   ├── service/        # Business logic (CRUD, transitions, filtering)
@@ -44,6 +46,7 @@ bujotui/
 git clone https://github.com/studiowebux/bujotui
 cd bujotui
 go build -o bujotui ./cmd/bujotui
+go build -o bujotui-mcp ./cmd/bujotui-mcp
 ```
 
 ## Usage
@@ -193,6 +196,52 @@ symbol = task
 ### Available Colors
 
 `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `gray`, `bright_white`, `bold_red`, `bold_green`, `bold_yellow`, `bold_blue`, `bold_cyan`, `bold_white`
+
+## MCP Server
+
+bujotui includes an MCP server (`bujotui-mcp`) that exposes journal operations as tools over stdio. This lets AI agents (Claude Code, etc.) read and write journal entries.
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `add_entry` | Add a new journal entry |
+| `list_entries` | List entries for a date |
+| `edit_entry` | Edit an entry by index |
+| `transition_entry` | Change entry state (done, migrated, etc.) |
+| `delete_entry` | Remove an entry |
+| `set_note` | Set daily note for a date |
+| `list_month` | List all entries and notes for a month |
+| `search` | Search entries across all fields |
+
+### Usage with Claude Code
+
+#### Option 1: Project config (`.mcp.json`)
+
+```json
+{
+  "mcpServers": {
+    "bujotui": {
+      "type": "stdio",
+      "command": "/absolute/path/to/bujotui-mcp"
+    }
+  }
+}
+```
+
+#### Option 2: CLI
+
+```bash
+claude mcp add --transport stdio bujotui -- /absolute/path/to/bujotui-mcp
+```
+
+### MCP CLI Flags
+
+```bash
+bujotui-mcp                          # default: logs to stderr
+bujotui-mcp -logfile /tmp/bujo.log   # redirect logs to a file
+bujotui-mcp -version                 # print version and exit
+```
 
 ## Data Format
 

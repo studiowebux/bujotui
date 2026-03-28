@@ -40,18 +40,27 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Build
+      - name: Build TUI
         env:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o bujotui-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/bujotui
 
-      - name: Upload artifact
+      - name: Build MCP
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -trimpath -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o bujotui-mcp-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/bujotui-mcp
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: bujotui-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: bujotui-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            bujotui-${{ matrix.goos }}-${{ matrix.goarch }}
+            bujotui-mcp-${{ matrix.goos }}-${{ matrix.goarch }}
           retention-days: 7
 
   release:
