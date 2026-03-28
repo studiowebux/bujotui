@@ -178,30 +178,34 @@ func (a *App) loadEntries() error {
 	return nil
 }
 
-// applyFilter uses service.FilterEntries to rebuild the filtered entries slice
-// and populates entryIndexMap to map filtered indices back to allDay indices.
+// applyFilter rebuilds the filtered entries slice from allDay.
 func (a *App) applyFilter() {
-	a.entries = nil
-	a.entryIndexMap = nil
+	fp := a.state.FilterProject
+	fn := a.state.FilterPerson
+	fs := a.state.FilterSymbol
+	ft := a.state.FilterText
 
-	for i, e := range a.allDay {
-		if !matchesFilter(e, a.state) {
-			continue
+	filtered := service.FilterEntries(a.allDay, fp, fn, fs, ft)
+
+	// Build index map from filtered results back to allDay positions.
+	a.entries = filtered
+	a.entryIndexMap = nil
+	if fp != "" || fn != "" || fs != "" || ft != "" {
+		fi := 0
+		for i := range a.allDay {
+			if fi < len(filtered) && a.allDay[i] == filtered[fi] {
+				a.entryIndexMap = append(a.entryIndexMap, i)
+				fi++
+			}
 		}
-		a.entries = append(a.entries, e)
-		a.entryIndexMap = append(a.entryIndexMap, i)
+	} else {
+		a.entryIndexMap = make([]int, len(a.allDay))
+		for i := range a.allDay {
+			a.entryIndexMap[i] = i
+		}
 	}
 
 	a.clampCursor()
-}
-
-// matchesFilter returns true if the entry passes all active filters.
-func matchesFilter(e model.Entry, vs *ViewState) bool {
-	filtered := service.FilterEntries(
-		[]model.Entry{e},
-		vs.FilterProject, vs.FilterPerson, vs.FilterSymbol, vs.FilterText,
-	)
-	return len(filtered) > 0
 }
 
 // updateSize reads the current terminal dimensions with mutex protection.

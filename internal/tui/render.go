@@ -227,7 +227,7 @@ const (
 	colStatus  = 12 // done, migrated, scheduled, cancelled, or empty
 	colSymbol  = 10 // task, event, note, idea, urgent, waiting
 	colTime    = 6  // HH:MM
-	colProject = 14 // project name
+	colProject = 20 // project name
 	colAssign  = 12 // assignee
 )
 

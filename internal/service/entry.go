@@ -10,6 +10,11 @@ import (
 	"github.com/studiowebux/bujotui/internal/storage"
 )
 
+// containsFold checks if s contains substr (which must already be lowercase).
+func containsFold(s, lowerSubstr string) bool {
+	return strings.Contains(strings.ToLower(s), lowerSubstr)
+}
+
 // checkIndex validates that index is within [0, length).
 func checkIndex(index, length int) error {
 	if index < 0 || index >= length {
@@ -347,8 +352,11 @@ func FilterEntries(entries []model.Entry, project, person, symbol, text string) 
 			continue
 		}
 		if text != "" {
-			haystack := strings.ToLower(e.Description + " " + e.Project + " " + e.Person + " " + e.Symbol.Name + " " + e.State)
-			if !strings.Contains(haystack, lowerText) {
+			if !containsFold(e.Description, lowerText) &&
+				!containsFold(e.Project, lowerText) &&
+				!containsFold(e.Person, lowerText) &&
+				!containsFold(e.Symbol.Name, lowerText) &&
+				!containsFold(e.State, lowerText) {
 				continue
 			}
 		}
