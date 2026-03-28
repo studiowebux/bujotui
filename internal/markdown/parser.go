@@ -149,15 +149,42 @@ func ParseEntryLine(line string, symbols *model.SymbolSet) (model.Entry, bool) {
 		}
 	}
 
+	// Extract migration links: ->YYYY-MM-DD and <-YYYY-MM-DD (optional)
+	var migratedTo, migratedFrom string
+	if strings.HasPrefix(rest, "->") {
+		tok := rest[2:]
+		spaceIdx := strings.IndexByte(tok, ' ')
+		if spaceIdx < 0 {
+			migratedTo = tok
+			rest = ""
+		} else {
+			migratedTo = tok[:spaceIdx]
+			rest = strings.TrimLeft(tok[spaceIdx+1:], " ")
+		}
+	}
+	if strings.HasPrefix(rest, "<-") {
+		tok := rest[2:]
+		spaceIdx := strings.IndexByte(tok, ' ')
+		if spaceIdx < 0 {
+			migratedFrom = tok
+			rest = ""
+		} else {
+			migratedFrom = tok[:spaceIdx]
+			rest = strings.TrimLeft(tok[spaceIdx+1:], " ")
+		}
+	}
+
 	// Remaining is description
 	desc := rest
 
 	return model.Entry{
-		Symbol:      sym,
-		State:       state,
-		Project:     project,
-		Person:      person,
-		Description: desc,
-		DateTime:    dt,
+		Symbol:       sym,
+		State:        state,
+		Project:      project,
+		Person:       person,
+		Description:  desc,
+		DateTime:     dt,
+		MigratedTo:   migratedTo,
+		MigratedFrom: migratedFrom,
 	}, true
 }

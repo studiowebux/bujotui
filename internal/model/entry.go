@@ -16,6 +16,8 @@ type Entry struct {
 	Person      string
 	Description string
 	DateTime    time.Time
+	MigratedTo  string // "YYYY-MM-DD" — where this entry was migrated to
+	MigratedFrom string // "YYYY-MM-DD" — where this entry was migrated from
 }
 
 // DayLog groups entries under a single date heading.

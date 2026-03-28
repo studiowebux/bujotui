@@ -1,6 +1,9 @@
 package tui
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // handleNormalKey processes key presses while in normal (list) mode.
 // It returns true if the application should quit.
@@ -143,6 +146,24 @@ func (a *App) handleNormalKey(key Key) bool {
 
 	case key.Char == 'g':
 		a.state.Cursor = 0
+
+	case key.Special == KeyEnter:
+		// Jump to migration link target/source
+		if len(a.entries) > 0 && a.state.Cursor < len(a.entries) {
+			e := a.entries[a.state.Cursor]
+			linkDate := e.MigratedTo
+			if linkDate == "" {
+				linkDate = e.MigratedFrom
+			}
+			if linkDate != "" {
+				t, err := time.ParseInLocation("2006-01-02", linkDate, time.Local)
+				if err == nil {
+					a.date = t
+					a.loadEntries()
+					a.state.Cursor = 0
+				}
+			}
+		}
 
 	case key.Char == '?':
 		a.state.Mode = ModeHelp

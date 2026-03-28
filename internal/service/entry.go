@@ -191,21 +191,26 @@ func (s *EntryService) MigrateEntry(sourceDate time.Time, index int, targetDate 
 		return fmt.Errorf("cannot migrate %q entries", entry.Symbol.Name)
 	}
 
-	// Create copy on target date
-	copy := model.Entry{
-		Symbol:      entry.Symbol,
-		State:       "",
-		Project:     entry.Project,
-		Person:      entry.Person,
-		Description: entry.Description,
-		DateTime:    targetDate,
+	srcDateStr := sourceDate.Format("2006-01-02")
+	tgtDateStr := targetDate.Format("2006-01-02")
+
+	// Create copy on target date with back-link
+	entryCopy := model.Entry{
+		Symbol:       entry.Symbol,
+		State:        "",
+		Project:      entry.Project,
+		Person:       entry.Person,
+		Description:  entry.Description,
+		DateTime:     targetDate,
+		MigratedFrom: srcDateStr,
 	}
-	if err := s.store.AddEntry(copy); err != nil {
+	if err := s.store.AddEntry(entryCopy); err != nil {
 		return fmt.Errorf("add migrated copy: %w", err)
 	}
 
-	// Mark original as migrated
+	// Mark original as migrated with forward-link
 	entry.State = "migrated"
+	entry.MigratedTo = tgtDateStr
 	if err := s.store.UpdateEntry(sourceDate, index, entry); err != nil {
 		return fmt.Errorf("mark original as migrated: %w", err)
 	}

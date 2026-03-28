@@ -65,6 +65,12 @@ func FormatEntry(e model.Entry) string {
 	if e.State != "" {
 		fmt.Fprintf(&b, " state:%s", e.State)
 	}
+	if e.MigratedTo != "" {
+		fmt.Fprintf(&b, " ->%s", e.MigratedTo)
+	}
+	if e.MigratedFrom != "" {
+		fmt.Fprintf(&b, " <-%s", e.MigratedFrom)
+	}
 	b.WriteByte(' ')
 	b.WriteString(e.Description)
 	return b.String()

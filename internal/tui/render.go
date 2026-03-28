@@ -176,6 +176,7 @@ func renderHelpBar(w io.Writer, width int) {
 	// Compact help bar that fits within terminal width
 	items := []struct{ key, label string }{
 		{"j/k", "move"},
+		{"Ret", "jump"},
 		{"x", "done"},
 		{">", "migrate"},
 		{"<", "sched"},
@@ -241,9 +242,17 @@ func renderEntryLine(w io.Writer, e model.Entry, selected bool, vs *ViewState, w
 		cursor = "> "
 	}
 
+	// Migration link suffix
+	migLink := ""
+	if e.MigratedTo != "" {
+		migLink = " -> " + e.MigratedTo
+	} else if e.MigratedFrom != "" {
+		migLink = " <- " + e.MigratedFrom
+	}
+
 	// Calculate space remaining for description and truncate if needed
 	fixedWidth := displayWidth(cursor + statusCol + symbolCol + timeCol + projCol + assignCol)
-	descMaxWidth := width - fixedWidth
+	descMaxWidth := width - fixedWidth - displayWidth(migLink)
 	if descMaxWidth < 0 {
 		descMaxWidth = 0
 	}
@@ -251,8 +260,7 @@ func renderEntryLine(w io.Writer, e model.Entry, selected bool, vs *ViewState, w
 	if displayWidth(desc) > descMaxWidth {
 		desc = truncateToWidth(desc, descMaxWidth-1) + "~"
 	}
-
-	padN := width - fixedWidth - displayWidth(desc)
+	padN := width - fixedWidth - displayWidth(desc) - displayWidth(migLink)
 	if padN < 0 {
 		padN = 0
 	}
@@ -261,7 +269,7 @@ func renderEntryLine(w io.Writer, e model.Entry, selected bool, vs *ViewState, w
 
 	if selected {
 		bg := term.BgHighlight
-		fmt.Fprintf(w, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+		fmt.Fprintf(w, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 			bg+term.FgCyan+term.Bold, cursor,
 			bg+sc, statusCol,
 			bg+term.FgBrightWhite, symbolCol,
@@ -269,10 +277,11 @@ func renderEntryLine(w io.Writer, e model.Entry, selected bool, vs *ViewState, w
 			bg+term.FgBrightWhite, projCol,
 			bg+term.FgBrightWhite, assignCol,
 			bg+term.Bold+term.FgBrightWhite, desc,
+			bg+term.FgCyan, migLink,
 			strings.Repeat(" ", padN),
 			term.Reset+nl)
 	} else {
-		fmt.Fprintf(w, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+		fmt.Fprintf(w, "%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 			term.FgBrightWhite, cursor,
 			sc, statusCol,
 			term.FgBrightWhite, symbolCol,
@@ -280,6 +289,7 @@ func renderEntryLine(w io.Writer, e model.Entry, selected bool, vs *ViewState, w
 			term.FgBrightWhite, projCol,
 			term.FgBrightWhite, assignCol,
 			term.FgBrightWhite, desc,
+			term.FgCyan, migLink,
 			strings.Repeat(" ", padN),
 			term.Reset+nl)
 	}
@@ -825,6 +835,7 @@ func renderHelpScreen(w io.Writer, vs *ViewState) {
 		mkKey("j/k", "Move up/down"),
 		mkKey("G", "Go to last entry"),
 		mkKey("g", "Go to first entry"),
+		mkKey("Enter", "Jump to migration link"),
 		mkKey("a", "Add new entry"),
 		mkKey("e", "Edit selected entry"),
 		mkKey("d", "Delete (confirm y/n)"),
