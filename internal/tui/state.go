@@ -1,0 +1,203 @@
+package tui
+
+import (
+	"github.com/studiowebux/bujotui/internal/config"
+	"github.com/studiowebux/bujotui/internal/model"
+)
+
+// Mode represents the current TUI interaction mode.
+type Mode int
+
+const (
+	ModeNormal  Mode = iota
+	ModeFilter       // typing a filter
+	ModeConfirm      // confirming a delete
+	ModeHelp         // showing help screen
+	ModeForm         // multi-field form for add/edit
+)
+
+// ViewState holds all view-layer state. This never leaks into model or data.
+type ViewState struct {
+	Cursor   int // selected entry index
+	Mode     Mode
+	ShowTime bool // toggle: show time column
+
+	// Input mode state
+	Input       EditBuffer
+	InputPrompt string // e.g. "filter> "
+
+	// Filter state
+	FilterProject string
+	FilterPerson  string
+	FilterSymbol  string
+	FilterText    string // free-text filter on description
+
+	// Autocomplete state
+	Completions    []string
+	CompletionIdx  int
+	CompletionType string // "symbol", "project", "person"
+
+	// Form state (add/edit modal)
+	Form *Form
+
+	// Confirm state
+	ConfirmMsg   string
+	ConfirmIndex int // entry index to act on
+
+	// Status message (shown for one frame after an action)
+	StatusMsg string
+
+	// Scroll
+	ScrollOffset int
+
+	// Terminal size
+	Width  int
+	Height int
+
+	// Config references (for rendering)
+	Symbols *model.SymbolSet
+	Cfg     *config.Config
+}
+
+// NewViewState returns a ViewState with sensible defaults.
+func NewViewState(cfg *config.Config) *ViewState {
+	return &ViewState{
+		CompletionIdx: -1,
+		Symbols:       cfg.Symbols,
+		Cfg:           cfg,
+	}
+}
+
+// InputString returns the current input buffer as a string.
+func (vs *ViewState) InputString() string {
+	return vs.Input.String()
+}
+
+// ClearInput resets the input buffer.
+func (vs *ViewState) ClearInput() {
+	vs.Input.Clear()
+	vs.ClearCompletions()
+}
+
+// ClearCompletions resets autocomplete state.
+func (vs *ViewState) ClearCompletions() {
+	vs.Completions = nil
+	vs.CompletionIdx = -1
+	vs.CompletionType = ""
+}
+
+// FormField represents a single field in the add/edit form.
+type FormField struct {
+	Label string // display label
+	Buf   EditBuffer
+	Type  string // "symbol", "project", "person", "text"
+}
+
+// Form holds the state for the multi-field add/edit form.
+type Form struct {
+	Fields  []FormField
+	Active  int  // index of focused field
+	IsEdit  bool // true = editing existing entry
+	EditIdx int  // index of entry being edited (-1 for new)
+}
+
+// ActiveField returns the currently focused field.
+func (f *Form) ActiveField() *FormField {
+	if f.Active >= 0 && f.Active < len(f.Fields) {
+		return &f.Fields[f.Active]
+	}
+	return nil
+}
+
+// NextField moves focus to the next field, wrapping around.
+func (f *Form) NextField() {
+	f.Active = (f.Active + 1) % len(f.Fields)
+}
+
+// PrevField moves focus to the previous field, wrapping around.
+func (f *Form) PrevField() {
+	f.Active = (f.Active - 1 + len(f.Fields)) % len(f.Fields)
+}
+
+// FieldInsertChar inserts a character in the active field.
+func (f *Form) FieldInsertChar(c byte) {
+	if field := f.ActiveField(); field != nil {
+		field.Buf.InsertChar(c)
+	}
+}
+
+// FieldDeleteChar removes the character before the cursor in the active field.
+func (f *Form) FieldDeleteChar() {
+	if field := f.ActiveField(); field != nil {
+		field.Buf.DeleteChar()
+	}
+}
+
+// FieldDeleteCharForward removes the character at the cursor in the active field.
+func (f *Form) FieldDeleteCharForward() {
+	if field := f.ActiveField(); field != nil {
+		field.Buf.DeleteCharForward()
+	}
+}
+
+// FieldWordLeft moves cursor to the start of the previous word.
+func (f *Form) FieldWordLeft() {
+	if field := f.ActiveField(); field != nil {
+		field.Buf.WordLeft()
+	}
+}
+
+// FieldWordRight moves cursor to the end of the next word.
+func (f *Form) FieldWordRight() {
+	if field := f.ActiveField(); field != nil {
+		field.Buf.WordRight()
+	}
+}
+
+// FieldDeleteWord removes the word before the cursor.
+func (f *Form) FieldDeleteWord() {
+	if field := f.ActiveField(); field != nil {
+		field.Buf.DeleteWord()
+	}
+}
+
+// FieldValue returns the string value of a field by type.
+func (f *Form) FieldValue(fieldType string) string {
+	for _, field := range f.Fields {
+		if field.Type == fieldType {
+			return field.Buf.String()
+		}
+	}
+	return ""
+}
+
+// AcceptCompletion replaces the current token with the selected completion.
+func (vs *ViewState) AcceptCompletion() {
+	if vs.CompletionIdx < 0 || vs.CompletionIdx >= len(vs.Completions) {
+		return
+	}
+	completion := vs.Completions[vs.CompletionIdx]
+
+	// Find the start of the current token
+	tokenStart := vs.Input.Cursor
+	for tokenStart > 0 && vs.Input.Data[tokenStart-1] != ' ' {
+		tokenStart--
+	}
+
+	// Handle @ prefix for people
+	prefix := ""
+	if tokenStart < len(vs.Input.Data) && vs.Input.Data[tokenStart] == '@' {
+		prefix = "@"
+		tokenStart++
+	}
+
+	// Replace token
+	after := make([]byte, len(vs.Input.Data[vs.Input.Cursor:]))
+	copy(after, vs.Input.Data[vs.Input.Cursor:])
+
+	vs.Input.Data = append(vs.Input.Data[:tokenStart], []byte(prefix+completion)...)
+	vs.Input.Cursor = len(vs.Input.Data)
+	vs.Input.Data = append(vs.Input.Data, after...)
+
+	vs.ClearCompletions()
+}
