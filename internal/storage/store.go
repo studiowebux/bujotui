@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/studiowebux/bujotui/internal/config"
+	bujocrypto "github.com/studiowebux/bujotui/internal/crypto"
 	"github.com/studiowebux/bujotui/internal/markdown"
 	"github.com/studiowebux/bujotui/internal/model"
 )
@@ -16,6 +17,10 @@ import (
 type Store struct {
 	Dir    string
 	Config *config.Config
+
+	// Vault provides optional encryption at rest. If nil, files are stored as plaintext.
+	Vault    *bujocrypto.Vault
+	KeySlots []*bujocrypto.KeySlot // key slots for encrypted file headers
 }
 
 // NewStore creates a Store and ensures required directories exist.
@@ -32,15 +37,43 @@ func (s *Store) MonthFile(t time.Time) string {
 	return filepath.Join(s.Dir, "daily", t.Format("2006-01")+".md")
 }
 
-// readFile reads a file and returns its bytes.
+// readFile reads a file, decrypting if the vault is set and the file is encrypted.
+// Returns plaintext bytes.
 func (s *Store) readFile(path string) ([]byte, error) {
-	return os.ReadFile(filepath.Clean(path)) // #nosec G304 -- path from user-configured data dir
+	data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- path from user-configured data dir
+	if err != nil {
+		return nil, err
+	}
+
+	if s.Vault != nil && bujocrypto.IsEncrypted(data) {
+		_, _, slots, ciphertext, err := bujocrypto.ParseFileRaw(data)
+		if err != nil {
+			return nil, fmt.Errorf("parse encrypted file: %w", err)
+		}
+		_ = slots
+		plaintext, err := s.Vault.Decrypt(ciphertext)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt file: %w", err)
+		}
+		return plaintext, nil
+	}
+
+	return data, nil
 }
 
 // writeFile versions the existing file then atomically writes new data.
+// Encrypts if the vault is set.
 func (s *Store) writeFile(path string, data []byte) error {
 	if err := saveVersion(path); err != nil {
 		return fmt.Errorf("save version: %w", err)
+	}
+
+	if s.Vault != nil {
+		encrypted, err := bujocrypto.EncryptFile(s.Vault, s.KeySlots, data)
+		if err != nil {
+			return fmt.Errorf("encrypt file: %w", err)
+		}
+		data = encrypted
 	}
 	return AtomicWriteFile(path, data, 0o644)
 }
