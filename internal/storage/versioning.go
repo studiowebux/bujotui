@@ -41,8 +41,8 @@ func saveVersion(path string) error {
 
 	// Write versioned copy
 	ts := time.Now().Unix()
-	versFile := filepath.Join(versDir, fmt.Sprintf("%s.v%d", base, ts))
-	if err := os.WriteFile(versFile, data, 0o644); err != nil {
+	versFile := filepath.Clean(filepath.Join(versDir, fmt.Sprintf("%s.v%d", base, ts)))
+	if err := os.WriteFile(versFile, data, 0o600); err != nil { // #nosec G306 G703 -- versFile is built from filepath.Join(dataDir, ".versions", base+timestamp), no user input in filename components
 		return fmt.Errorf("write version: %w", err)
 	}
 
