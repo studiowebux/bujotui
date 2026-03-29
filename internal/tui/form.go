@@ -2,6 +2,11 @@ package tui
 
 import "strings"
 
+// isSelectField returns true if the field type uses a select-list UX.
+func isSelectField(fieldType string) bool {
+	return fieldType == "status" || fieldType == "symbol"
+}
+
 // handleFormKey processes key events while the multi-field form is active.
 func (a *App) handleFormKey(key Key) bool {
 	form := a.state.Form
@@ -19,98 +24,118 @@ func (a *App) handleFormKey(key Key) bool {
 		a.state.ClearCompletions()
 
 	case key.Special == KeyTab:
-		// If completions are showing, cycle through them
-		if len(a.state.Completions) > 0 {
-			a.state.CompletionIdx = (a.state.CompletionIdx + 1) % len(a.state.Completions)
-			return false
-		}
-		a.state.ClearCompletions()
-		form.NextField()
+		a.acceptAndNextField(form)
 
 	case key.Special == KeyShiftTab:
-		a.state.ClearCompletions()
-		form.PrevField()
+		a.acceptAndPrevField(form)
 
 	case key.Special == KeyEnter:
-		// If completion is active, accept it
-		if a.state.CompletionIdx >= 0 && len(a.state.Completions) > 0 {
+		if len(a.state.Completions) > 0 && a.state.CompletionIdx >= 0 {
+			// Accept selection and move to next field
 			a.acceptFormCompletion()
-			return false
-		}
-		// Submit form
-		a.submitForm()
-
-	case key.Special == KeyBackspace:
-		if field != nil {
-			form.FieldDeleteChar()
-			a.updateFormCompletions()
-		}
-
-	case key.Special == KeyDelete:
-		if field != nil {
-			form.FieldDeleteCharForward()
-			a.updateFormCompletions()
+			form.NextField()
+			a.showFieldOptions()
+		} else if field != nil && isSelectField(field.Type) {
+			// On select field with no completions, just move on
+			form.NextField()
+			a.showFieldOptions()
+		} else {
+			// Submit form (only from text fields)
+			a.submitForm()
 		}
 
-	case key.Special == KeyLeft:
-		if field != nil && field.Buf.Cursor > 0 {
-			field.Buf.Cursor--
+	case key.Special == KeyDown:
+		if len(a.state.Completions) > 0 {
+			a.state.CompletionIdx = (a.state.CompletionIdx + 1) % len(a.state.Completions)
 		}
 
-	case key.Special == KeyRight:
-		if field != nil && field.Buf.Cursor < len(field.Buf.Data) {
-			field.Buf.Cursor++
+	case key.Special == KeyUp:
+		if len(a.state.Completions) > 0 {
+			a.state.CompletionIdx = (a.state.CompletionIdx - 1 + len(a.state.Completions)) % len(a.state.Completions)
 		}
 
-	case key.Special == KeyWordLeft:
-		form.FieldWordLeft()
-
-	case key.Special == KeyWordRight:
-		form.FieldWordRight()
-
-	case key.Special == KeyDeleteWord:
-		form.FieldDeleteWord()
-		a.updateFormCompletions()
-
-	case key.Special == KeyHome:
-		if field != nil {
-			field.Buf.Cursor = 0
-		}
-
-	case key.Special == KeyEnd:
-		if field != nil {
-			field.Buf.Cursor = len(field.Buf.Data)
-		}
-
-	case key.Special == KeyKillLine:
-		if field != nil {
-			field.Buf.KillLine()
-			a.state.ClearCompletions()
-		}
-
-	case key.Special == KeyKillBack:
-		if field != nil {
-			field.Buf.KillBack()
-			a.updateFormCompletions()
-		}
-
-	case key.Char != 0:
-		if field != nil {
-			// Accept completion on space for completable fields
-			if a.state.CompletionIdx >= 0 && key.Char == ' ' && field.Type != "text" {
-				a.acceptFormCompletion()
-				return false
+	default:
+		if field != nil && !isSelectField(field.Type) {
+			// Text/project/person fields: use EditBuffer for typing
+			handled := false
+			switch {
+			case key.Special == KeyBackspace:
+				form.FieldDeleteChar()
+				handled = true
+			case key.Special == KeyDelete:
+				form.FieldDeleteCharForward()
+				handled = true
+			case key.Special == KeyLeft:
+				if field.Buf.Cursor > 0 {
+					field.Buf.Cursor--
+				}
+				handled = true
+			case key.Special == KeyRight:
+				if field.Buf.Cursor < len(field.Buf.Data) {
+					field.Buf.Cursor++
+				}
+				handled = true
+			case key.Special == KeyWordLeft:
+				form.FieldWordLeft()
+				handled = true
+			case key.Special == KeyWordRight:
+				form.FieldWordRight()
+				handled = true
+			case key.Special == KeyDeleteWord:
+				form.FieldDeleteWord()
+				handled = true
+			case key.Special == KeyHome:
+				field.Buf.Cursor = 0
+				handled = true
+			case key.Special == KeyEnd:
+				field.Buf.Cursor = len(field.Buf.Data)
+				handled = true
+			case key.Special == KeyKillLine:
+				field.Buf.KillLine()
+				handled = true
+			case key.Special == KeyKillBack:
+				field.Buf.KillBack()
+				handled = true
+			case key.Char != 0:
+				form.FieldInsertChar(key.Char)
+				handled = true
 			}
-			form.FieldInsertChar(key.Char)
-			a.updateFormCompletions()
+			if handled {
+				a.updateFormCompletions()
+			}
 		}
+		// Select fields: j/k handled above, typing not allowed (use arrows to pick)
 	}
 
 	return false
 }
 
-// updateFormCompletions refreshes the autocomplete list based on the
-// active form field's current value.
+// acceptAndNextField accepts any active completion and moves to the next field.
+func (a *App) acceptAndNextField(form *Form) {
+	if a.state.CompletionIdx >= 0 && len(a.state.Completions) > 0 {
+		a.acceptFormCompletion()
+	}
+	form.NextField()
+	a.showFieldOptions()
+}
+
+// acceptAndPrevField accepts any active completion and moves to the previous field.
+func (a *App) acceptAndPrevField(form *Form) {
+	if a.state.CompletionIdx >= 0 && len(a.state.Completions) > 0 {
+		a.acceptFormCompletion()
+	}
+	form.PrevField()
+	a.showFieldOptions()
+}
+
+// showFieldOptions shows all available options for the current field.
+func (a *App) showFieldOptions() {
+	a.updateFormCompletions()
+}
+
+// updateFormCompletions refreshes the completion list based on the
+// active form field. For select fields, shows all options. For text
+// fields, shows matching completions.
 func (a *App) updateFormCompletions() {
 	form := a.state.Form
 	if form == nil {
@@ -124,18 +149,30 @@ func (a *App) updateFormCompletions() {
 
 	prefix := field.Buf.String()
 	lower := strings.ToLower(prefix)
+
 	switch field.Type {
 	case "status":
+		// Always show all states, highlight matching
 		var matches []string
 		for _, s := range a.cfg.Symbols.StateNames() {
 			if prefix == "" || strings.HasPrefix(strings.ToLower(s), lower) {
 				matches = append(matches, s)
 			}
 		}
+		// Add empty option at the top (no state = active)
+		if prefix == "" {
+			matches = append([]string{"(none)"}, matches...)
+		}
 		a.state.Completions = matches
 		a.state.CompletionType = "status"
 	case "symbol":
-		a.state.Completions = a.completer.CompleteSymbol(prefix)
+		var matches []string
+		for _, s := range a.cfg.Symbols.SymbolNames() {
+			if prefix == "" || strings.HasPrefix(strings.ToLower(s), lower) {
+				matches = append(matches, s)
+			}
+		}
+		a.state.Completions = matches
 		a.state.CompletionType = "symbol"
 	case "project":
 		a.state.Completions = a.completer.CompleteProject(prefix)
@@ -167,6 +204,9 @@ func (a *App) acceptFormCompletion() {
 		return
 	}
 	completion := a.state.Completions[a.state.CompletionIdx]
+	if completion == "(none)" {
+		completion = ""
+	}
 	field.Buf.Set(completion)
 	a.state.ClearCompletions()
 }

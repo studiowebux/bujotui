@@ -660,9 +660,8 @@ func renderForm(w io.Writer, vs *ViewState) {
 		fieldW = 10
 	}
 
-	// Calculate box height — always reserve max space for completions
-	// to avoid stale content when completions appear/disappear
-	maxCompletions := 7 // 6 visible + "more" line
+	// Calculate box height — reserve space for fields + select options + completions
+	maxCompletions := 10 // 8 visible + scroll indicators
 	boxH := 5 + len(form.Fields) + maxCompletions
 	if boxH > height-2 {
 		boxH = height - 2
@@ -704,6 +703,7 @@ func renderForm(w io.Writer, vs *ViewState) {
 
 	for i, field := range form.Fields {
 		isActive := i == form.Active
+		isSelect := field.Type == "status" || field.Type == "symbol"
 
 		// Label
 		label := fmt.Sprintf("%-13s", field.Label+":")
@@ -712,69 +712,150 @@ func renderForm(w io.Writer, vs *ViewState) {
 			lblStyle = activeLbl
 		}
 
-		// Field value — scroll to keep cursor visible
-		fullVal := field.Buf.String()
-		cursor := field.Buf.Cursor
-		scrollOffset := 0
-		if cursor > fieldW-1 {
-			scrollOffset = cursor - fieldW + 1
-		}
-		val := fullVal
-		if scrollOffset > 0 && scrollOffset < len(val) {
-			val = val[scrollOffset:]
-		}
-		if len(val) > fieldW {
-			val = val[:fieldW]
-		}
-		valPad := fieldW - len(val)
-		if valPad < 0 {
-			valPad = 0
-		}
-
-		fldStyle := inactiveField
-		if isActive {
-			fldStyle = activeField
-		}
-
-		// Single write per row: position once, write label + field + padding
 		fieldCol := startCol + 2 + labelW
 		rightPad := boxW - 2 - 13 - fieldW
 		if rightPad < 0 {
 			rightPad = 0
 		}
-		term.MoveCursor(w, row, startCol)
-		fmt.Fprintf(w, "%s  %s%s%s%s%s%s%s%s",
-			bg, lblStyle, label, bg,
-			fldStyle, val, strings.Repeat(" ", valPad),
-			bg, strings.Repeat(" ", rightPad)+term.Reset)
 
-		if isActive {
-			cursorRow = row
-			cursorCol = fieldCol + cursor - scrollOffset
-		}
+		if isSelect {
+			// Select field: show the current value or the highlighted option
+			val := field.Buf.String()
+			if isActive && vs.CompletionIdx >= 0 && vs.CompletionIdx < len(vs.Completions) {
+				val = vs.Completions[vs.CompletionIdx]
+			}
+			if val == "" {
+				val = "(none)"
+			}
+			if len(val) > fieldW {
+				val = val[:fieldW]
+			}
+			valPad := fieldW - len(val)
+			if valPad < 0 {
+				valPad = 0
+			}
 
-		row++
+			fldStyle := inactiveField
+			if isActive {
+				fldStyle = activeField
+			}
 
-		// Completions below active field
-		if isActive && len(vs.Completions) > 0 {
-			maxShow := 6
-			for ci, c := range vs.Completions {
-				if ci >= maxShow {
+			term.MoveCursor(w, row, startCol)
+			fmt.Fprintf(w, "%s  %s%s%s%s%s%s%s%s",
+				bg, lblStyle, label, bg,
+				fldStyle, val, strings.Repeat(" ", valPad),
+				bg, strings.Repeat(" ", rightPad)+term.Reset)
+			row++
+
+			// Show options list for active select field
+			if isActive && len(vs.Completions) > 0 {
+				maxShow := 8
+				scrollStart := 0
+				if vs.CompletionIdx >= maxShow {
+					scrollStart = vs.CompletionIdx - maxShow + 1
+				}
+				scrollEnd := scrollStart + maxShow
+				if scrollEnd > len(vs.Completions) {
+					scrollEnd = len(vs.Completions)
+				}
+
+				if scrollStart > 0 {
 					drawBg(row)
 					term.MoveCursor(w, row, startCol+4)
-					remaining := len(vs.Completions) - maxShow
-					fmt.Fprintf(w, "%s...%d more%s", dim, remaining, term.Reset)
+					fmt.Fprintf(w, "%s...%d above%s", dim, scrollStart, term.Reset)
 					row++
-					break
 				}
-				drawBg(row)
-				term.MoveCursor(w, row, startCol+2)
-				if ci == vs.CompletionIdx {
-					fmt.Fprintf(w, "%s> %s%s", activeLbl, c, term.Reset)
-				} else {
-					fmt.Fprintf(w, "%s  %s%s", dim, c, term.Reset)
+				for ci := scrollStart; ci < scrollEnd; ci++ {
+					c := vs.Completions[ci]
+					drawBg(row)
+					term.MoveCursor(w, row, startCol+2)
+					if ci == vs.CompletionIdx {
+						fmt.Fprintf(w, "%s > %-*s%s", hi, boxW-6, c, term.Reset)
+					} else {
+						fmt.Fprintf(w, "%s   %-*s%s", dim, boxW-6, c, term.Reset)
+					}
+					row++
 				}
-				row++
+				if scrollEnd < len(vs.Completions) {
+					drawBg(row)
+					term.MoveCursor(w, row, startCol+4)
+					fmt.Fprintf(w, "%s...%d more%s", dim, len(vs.Completions)-scrollEnd, term.Reset)
+					row++
+				}
+			}
+		} else {
+			// Text field: editable with cursor
+			fullVal := field.Buf.String()
+			cursor := field.Buf.Cursor
+			scrollOffset := 0
+			if cursor > fieldW-1 {
+				scrollOffset = cursor - fieldW + 1
+			}
+			val := fullVal
+			if scrollOffset > 0 && scrollOffset < len(val) {
+				val = val[scrollOffset:]
+			}
+			if len(val) > fieldW {
+				val = val[:fieldW]
+			}
+			valPad := fieldW - len(val)
+			if valPad < 0 {
+				valPad = 0
+			}
+
+			fldStyle := inactiveField
+			if isActive {
+				fldStyle = activeField
+			}
+
+			term.MoveCursor(w, row, startCol)
+			fmt.Fprintf(w, "%s  %s%s%s%s%s%s%s%s",
+				bg, lblStyle, label, bg,
+				fldStyle, val, strings.Repeat(" ", valPad),
+				bg, strings.Repeat(" ", rightPad)+term.Reset)
+
+			if isActive {
+				cursorRow = row
+				cursorCol = fieldCol + cursor - scrollOffset
+			}
+
+			row++
+
+			// Completions below active text field
+			if isActive && len(vs.Completions) > 0 {
+				maxShow := 6
+				scrollStart := 0
+				if vs.CompletionIdx >= maxShow {
+					scrollStart = vs.CompletionIdx - maxShow + 1
+				}
+				scrollEnd := scrollStart + maxShow
+				if scrollEnd > len(vs.Completions) {
+					scrollEnd = len(vs.Completions)
+				}
+
+				if scrollStart > 0 {
+					drawBg(row)
+					term.MoveCursor(w, row, startCol+4)
+					fmt.Fprintf(w, "%s...%d above%s", dim, scrollStart, term.Reset)
+					row++
+				}
+				for ci := scrollStart; ci < scrollEnd; ci++ {
+					c := vs.Completions[ci]
+					drawBg(row)
+					term.MoveCursor(w, row, startCol+2)
+					if ci == vs.CompletionIdx {
+						fmt.Fprintf(w, "%s> %s%s", activeLbl, c, term.Reset)
+					} else {
+						fmt.Fprintf(w, "%s  %s%s", dim, c, term.Reset)
+					}
+					row++
+				}
+				if scrollEnd < len(vs.Completions) {
+					drawBg(row)
+					term.MoveCursor(w, row, startCol+4)
+					fmt.Fprintf(w, "%s...%d more%s", dim, len(vs.Completions)-scrollEnd, term.Reset)
+					row++
+				}
 			}
 		}
 	}
@@ -786,7 +867,7 @@ func renderForm(w io.Writer, vs *ViewState) {
 	// Footer
 	drawBg(row)
 	term.MoveCursor(w, row, startCol+2)
-	fmt.Fprintf(w, "%sTab:next  S-Tab:prev  Enter:ok  Esc:cancel%s", dim, term.Reset)
+	fmt.Fprintf(w, "%s arrows:pick  Tab:next  S-Tab:prev  Enter:ok  Esc:cancel%s", dim, term.Reset)
 	row++
 
 	// Fill remaining rows to clear stale content

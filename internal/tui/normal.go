@@ -36,16 +36,16 @@ func (a *App) handleNormalKey(key Key) bool {
 		a.state.Mode = ModeForm
 		a.state.Form = &Form{
 			Fields: []FormField{
-				{Label: "Status", Buf: EditBuffer{}, Type: "status"},
 				{Label: "Symbol", Buf: EditBuffer{}, Type: "symbol"},
 				{Label: "Project", Buf: EditBuffer{}, Type: "project"},
 				{Label: "Assignee", Buf: EditBuffer{}, Type: "person"},
 				{Label: "Description", Buf: EditBuffer{}, Type: "text"},
 			},
-			Active:  4, // focus description
+			Active:  0, // focus symbol first
 			IsEdit:  false,
 			EditIdx: -1,
 		}
+		a.showFieldOptions()
 
 	case key.Char == 'e':
 		if len(a.entries) > 0 && a.state.Cursor < len(a.entries) {
@@ -64,6 +64,7 @@ func (a *App) handleNormalKey(key Key) bool {
 				IsEdit:  true,
 				EditIdx: realIdx,
 			}
+			a.showFieldOptions()
 		}
 
 	case key.Char == 'x':
