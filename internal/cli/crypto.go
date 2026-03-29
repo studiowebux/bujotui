@@ -19,25 +19,25 @@ func cmdKeygen(configDir string, stdout io.Writer) error {
 		return err
 	}
 
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Clean(configDir), 0o700); err != nil { // #nosec G703 -- configDir comes from DefaultConfigDir() or --dir flag, not arbitrary user input
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
-	privPath := filepath.Join(configDir, "bujotui.key")
-	pubPath := filepath.Join(configDir, "bujotui.pub")
+	privPath := filepath.Clean(filepath.Join(configDir, "bujotui.key"))
+	pubPath := filepath.Clean(filepath.Join(configDir, "bujotui.pub"))
 
 	// Don't overwrite existing keys
-	if _, err := os.Stat(privPath); err == nil {
+	if _, err := os.Stat(privPath); err == nil { // #nosec G703 -- privPath is configDir + constant filename, no user-controlled path components
 		return fmt.Errorf("key already exists at %s (remove it first to regenerate)", privPath)
 	}
 
 	privHex := hex.EncodeToString(kp.MarshalPrivateKey())
 	pubHex := hex.EncodeToString(kp.MarshalPublicKey())
 
-	if err := os.WriteFile(privPath, []byte(privHex+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(privPath, []byte(privHex+"\n"), 0o600); err != nil { // #nosec G703 -- privPath is configDir + "bujotui.key"
 		return fmt.Errorf("write private key: %w", err)
 	}
-	if err := os.WriteFile(pubPath, []byte(pubHex+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(pubPath, []byte(pubHex+"\n"), 0o600); err != nil { // #nosec G703 -- pubPath is configDir + "bujotui.pub"
 		return fmt.Errorf("write public key: %w", err)
 	}
 
@@ -204,14 +204,14 @@ func openVaultFromFiles(dataDir, password, privKeyPath string) (*bujocrypto.Vaul
 // findFirstEncryptedFile walks the data directory for any encrypted file.
 func findFirstEncryptedFile(dataDir string) (string, error) {
 	var found string
-	err := filepath.Walk(dataDir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dataDir, func(path string, info os.FileInfo, err error) error { // #nosec G122 G703 -- Walk on user-configured data dir to detect encrypted files; TOCTOU accepted
 		if err != nil || found != "" || info.IsDir() {
 			return nil
 		}
 		if !strings.HasSuffix(path, ".md") {
 			return nil
 		}
-		data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304
+		data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 G122 -- reading user data dir to detect encryption
 		if err != nil {
 			return nil
 		}
@@ -245,7 +245,7 @@ func findFirstEncryptedSlots(dataDir string) ([]*bujocrypto.KeySlot, error) {
 // encryptAllFiles encrypts all .md files in the data directory.
 func encryptAllFiles(store *storage.Store) (int, error) {
 	count := 0
-	return count, filepath.Walk(store.Dir, func(path string, info os.FileInfo, err error) error {
+	return count, filepath.Walk(store.Dir, func(path string, info os.FileInfo, err error) error { // #nosec G122 -- encrypting user's own data dir; TOCTOU risk accepted
 		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".md") {
 			return nil
 		}
@@ -254,7 +254,7 @@ func encryptAllFiles(store *storage.Store) (int, error) {
 			return nil
 		}
 
-		data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304
+		data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 G122 -- encrypting user's own data files
 		if err != nil || bujocrypto.IsEncrypted(data) {
 			return nil // skip already encrypted or unreadable
 		}
@@ -275,7 +275,7 @@ func encryptAllFiles(store *storage.Store) (int, error) {
 // decryptAllFiles decrypts all encrypted .md files in the data directory.
 func decryptAllFiles(store *storage.Store) (int, error) {
 	count := 0
-	return count, filepath.Walk(store.Dir, func(path string, info os.FileInfo, err error) error {
+	return count, filepath.Walk(store.Dir, func(path string, info os.FileInfo, err error) error { // #nosec G122 -- decrypting user's own data dir; TOCTOU risk accepted
 		if err != nil || info.IsDir() || !strings.HasSuffix(path, ".md") {
 			return nil
 		}
@@ -283,7 +283,7 @@ func decryptAllFiles(store *storage.Store) (int, error) {
 			return nil
 		}
 
-		data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304
+		data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 G122 -- decrypting user's own data files
 		if err != nil || !bujocrypto.IsEncrypted(data) {
 			return nil
 		}

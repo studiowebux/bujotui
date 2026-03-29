@@ -39,7 +39,7 @@ func EncryptFile(vault *Vault, slots []*KeySlot, plaintext []byte) ([]byte, erro
 	buf := make([]byte, totalSize)
 	copy(buf[0:4], magic[:])
 	buf[4] = formatVersion
-	buf[5] = byte(len(slots))
+	buf[5] = byte(len(slots)) // #nosec G115 -- len(slots) is bounded to 0-255 by the check on line 31
 
 	offset := headerSize
 	for _, slot := range slots {
