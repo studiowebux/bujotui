@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,17 +40,16 @@ func (s *Store) futureFile(year int) string {
 //	## February
 //	- . Tax deadline
 func (s *Store) LoadFuture(year int) ([]model.FutureMonth, error) {
-	path := filepath.Clean(s.futureFile(year))
-	f, err := os.Open(path) // #nosec G304 -- path from user-configured data dir
+	path := s.futureFile(year)
+	data, err := s.readFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("open future file: %w", err)
+		return nil, fmt.Errorf("load future file: %w", err)
 	}
-	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var months []model.FutureMonth
 	var current *model.FutureMonth
 
@@ -115,7 +115,7 @@ func (s *Store) SaveFuture(year int, months []model.FutureMonth) error {
 	}
 
 	path := s.futureFile(year)
-	return AtomicWriteFile(path, []byte(b.String()), 0o644)
+	return s.writeFile(path, []byte(b.String()))
 }
 
 // parseMonthName converts a month name to its number (1-12). Returns 0 if unknown.

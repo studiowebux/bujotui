@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/studiowebux/bujotui/internal/config"
+	bujocrypto "github.com/studiowebux/bujotui/internal/crypto"
 	"github.com/studiowebux/bujotui/internal/markdown"
 	"github.com/studiowebux/bujotui/internal/model"
 )
@@ -16,6 +17,10 @@ import (
 type Store struct {
 	Dir    string
 	Config *config.Config
+
+	// Vault provides optional encryption at rest. If nil, files are stored as plaintext.
+	Vault    *bujocrypto.Vault
+	KeySlots []*bujocrypto.KeySlot // key slots for encrypted file headers
 }
 
 // NewStore creates a Store and ensures required directories exist.
@@ -35,23 +40,22 @@ func (s *Store) MonthFile(t time.Time) string {
 // LoadMonth reads and parses the monthly file.
 // Returns (nil, nil) if the file does not exist — callers should treat nil as empty.
 func (s *Store) LoadMonth(t time.Time) ([]model.DayLog, error) {
-	path := filepath.Clean(s.MonthFile(t))
-	f, err := os.Open(path) // #nosec G304 -- path is constructed from user-configured data dir
+	path := s.MonthFile(t)
+	data, err := s.readFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("open month file: %w", err)
+		return nil, fmt.Errorf("load month file: %w", err)
 	}
-	defer f.Close()
-	return markdown.ParseFile(f, s.Config.Symbols)
+	return markdown.ParseBytes(data, s.Config.Symbols)
 }
 
 // SaveMonth writes DayLogs to the monthly file atomically.
 func (s *Store) SaveMonth(t time.Time, days []model.DayLog) error {
 	path := s.MonthFile(t)
 	data := markdown.FormatFile(days)
-	return AtomicWriteFile(path, data, 0o644)
+	return s.writeFile(path, data)
 }
 
 // LoadDay returns entries for a specific date.
@@ -236,6 +240,48 @@ func (s *Store) AllPeople(days []model.DayLog) []string {
 		}
 	}
 	return list
+}
+
+// readFile reads a file, decrypting if the vault is set and the file is encrypted.
+// Returns plaintext bytes.
+func (s *Store) readFile(path string) ([]byte, error) {
+	data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- path from user-configured data dir
+	if err != nil {
+		return nil, err
+	}
+
+	if s.Vault != nil && bujocrypto.IsEncrypted(data) {
+		_, _, slots, ciphertext, err := bujocrypto.ParseFileRaw(data)
+		if err != nil {
+			return nil, fmt.Errorf("parse encrypted file: %w", err)
+		}
+		_ = slots
+		plaintext, err := s.Vault.Decrypt(ciphertext)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt file: %w", err)
+		}
+		return plaintext, nil
+	}
+
+	return data, nil
+}
+
+// writeFile writes data, encrypting if the vault is set.
+// Saves a version of the previous file before overwriting.
+func (s *Store) writeFile(path string, data []byte) error {
+	// Version the existing file before overwriting
+	if err := saveVersion(path); err != nil {
+		return fmt.Errorf("save version: %w", err)
+	}
+
+	if s.Vault != nil {
+		encrypted, err := bujocrypto.EncryptFile(s.Vault, s.KeySlots, data)
+		if err != nil {
+			return fmt.Errorf("encrypt file: %w", err)
+		}
+		data = encrypted
+	}
+	return AtomicWriteFile(path, data, 0o644)
 }
 
 func truncateToDay(t time.Time) time.Time {

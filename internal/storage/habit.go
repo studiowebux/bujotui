@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,18 +39,17 @@ func (s *Store) habitFile(t time.Time) string {
 //	## Read
 //	1,2,3,4,5,6,7
 func (s *Store) LoadHabits(t time.Time) (*model.HabitTracker, error) {
-	path := filepath.Clean(s.habitFile(t))
-	f, err := os.Open(path) // #nosec G304 -- path is constructed from user-configured data dir
+	path := s.habitFile(t)
+	data, err := s.readFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return model.NewHabitTracker(), nil
 		}
-		return nil, fmt.Errorf("open habits file: %w", err)
+		return nil, fmt.Errorf("load habits file: %w", err)
 	}
-	defer f.Close()
 
 	ht := model.NewHabitTracker()
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var currentHabit string
 
 	for scanner.Scan() {
@@ -106,5 +106,5 @@ func (s *Store) SaveHabits(t time.Time, ht *model.HabitTracker) error {
 	}
 
 	path := s.habitFile(t)
-	return AtomicWriteFile(path, []byte(b.String()), 0o644)
+	return s.writeFile(path, []byte(b.String()))
 }
