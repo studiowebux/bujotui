@@ -182,13 +182,18 @@ bottom:
 		return
 	}
 
-	if vs.HabAdding {
-		fmt.Fprintf(w, " %snew habit:%s %s",
-			term.FgCyan+term.Bold, term.Reset, vs.HabEditBuf.String())
+	if vs.HabAdding || vs.HabEditing {
+		label := "new habit:"
+		buf := &vs.HabEditBuf
+		if vs.HabEditing {
+			label = "edit habit:"
+			buf = &vs.HabEditBuf
+		}
+		fmt.Fprintf(w, " %s%s%s %s",
+			term.FgCyan+term.Bold, label, term.Reset, buf.String())
+		// Save cursor position right after the text we just wrote
 		fmt.Fprint(w, "\x1b[0J")
-		col := len(" new habit: ") + vs.HabEditBuf.Cursor + 1
-		row := height - 1
-		term.MoveCursor(w, row, col)
+		fmt.Fprintf(w, "\x1b[%d;%dH", height, len(" "+label+" ")+buf.Cursor+1)
 		term.ShowCursor(w)
 		return
 	}
@@ -196,9 +201,10 @@ bottom:
 	if vs.StatusMsg != "" {
 		fmt.Fprintf(w, " %s%s%s", term.FgRed+term.Bold, vs.StatusMsg, term.Reset)
 	} else {
-		fmt.Fprintf(w, " %sj/k%s move %s|%s %s[%s prev %s]%s next %s|%s %sx%s toggle %s|%s %sa%s add %s|%s %sd%s del %s|%s %sEsc%s back",
+		fmt.Fprintf(w, " %sj/k%s move %s|%s %s[%s prev %s]%s next %s|%s %sx%s toggle %s|%s %sa%s add %s|%s %se%s edit %s|%s %sd%s del %s|%s %sEsc%s back",
 			term.FgCyan, term.Reset, term.FgGray, term.Reset,
 			term.FgCyan, term.Reset, term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgGray, term.Reset,
 			term.FgCyan, term.Reset, term.FgGray, term.Reset,
 			term.FgCyan, term.Reset, term.FgGray, term.Reset,
 			term.FgCyan, term.Reset, term.FgGray, term.Reset,

@@ -1,9 +1,13 @@
 package service
 
 import (
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/studiowebux/bujotui/internal/config"
 	"github.com/studiowebux/bujotui/internal/model"
+	"github.com/studiowebux/bujotui/internal/storage"
 )
 
 // ---------- checkIndex ----------
@@ -242,5 +246,237 @@ func TestFilterEntries_EmptySlice(t *testing.T) {
 	result = FilterEntries([]model.Entry{}, "proj", "", "", "")
 	if len(result) != 0 {
 		t.Fatalf("expected 0 for empty input, got %d", len(result))
+	}
+}
+
+// ---------- EntryService CRUD ----------
+
+func setupTestService(t *testing.T) (*EntryService, *storage.Store) {
+	t.Helper()
+	dir := t.TempDir()
+	cfg, err := config.Load(dir, dir)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	store, err := storage.NewStore(cfg)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	return NewEntryService(store, cfg), store
+}
+
+func TestAddEntry_Valid(t *testing.T) {
+	svc, _ := setupTestService(t)
+	entry, err := svc.AddEntry("task", "", "work", "self", "Buy milk")
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if entry.Description != "Buy milk" {
+		t.Errorf("desc = %q, want %q", entry.Description, "Buy milk")
+	}
+	if entry.Symbol.Name != "task" {
+		t.Errorf("symbol = %q, want task", entry.Symbol.Name)
+	}
+
+	entries, _ := svc.LoadDay(time.Now())
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+}
+
+func TestAddEntry_EmptyDescription(t *testing.T) {
+	svc, _ := setupTestService(t)
+	_, err := svc.AddEntry("task", "", "", "", "")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestAddEntry_TooLong(t *testing.T) {
+	svc, _ := setupTestService(t)
+	_, err := svc.AddEntry("task", "", "", "", strings.Repeat("x", 1001))
+	if err == nil {
+		t.Fatal("expected error for too long description")
+	}
+}
+
+func TestAddEntry_UnknownSymbol(t *testing.T) {
+	svc, _ := setupTestService(t)
+	_, err := svc.AddEntry("nonexistent", "", "", "", "test")
+	if err == nil {
+		t.Fatal("expected error for unknown symbol")
+	}
+}
+
+func TestEditEntry_Valid(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "work", "self", "Original")
+
+	err := svc.EditEntry(time.Now(), 0, "task", "", "work", "self", "Updated")
+	if err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+
+	entries, _ := svc.LoadDay(time.Now())
+	if entries[0].Description != "Updated" {
+		t.Errorf("desc = %q, want Updated", entries[0].Description)
+	}
+}
+
+func TestEditEntry_OutOfRange(t *testing.T) {
+	svc, _ := setupTestService(t)
+	err := svc.EditEntry(time.Now(), 0, "task", "", "", "", "test")
+	if err == nil {
+		t.Fatal("expected error for out of range")
+	}
+}
+
+func TestDeleteEntry_Valid(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "", "", "Delete me")
+
+	err := svc.DeleteEntry(time.Now(), 0)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	entries, _ := svc.LoadDay(time.Now())
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(entries))
+	}
+}
+
+func TestDeleteEntry_OutOfRange(t *testing.T) {
+	svc, _ := setupTestService(t)
+	err := svc.DeleteEntry(time.Now(), 0)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestTransitionEntry_TaskToDone(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "", "", "Finish this")
+
+	err := svc.TransitionEntry(time.Now(), 0, "done")
+	if err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+
+	entries, _ := svc.LoadDay(time.Now())
+	if entries[0].State != "done" {
+		t.Errorf("state = %q, want done", entries[0].State)
+	}
+}
+
+func TestTransitionEntry_InvalidTransition(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("event", "", "", "", "Meeting")
+
+	err := svc.TransitionEntry(time.Now(), 0, "done")
+	if err == nil {
+		t.Fatal("expected error — event has no transitions")
+	}
+}
+
+func TestResetState_ClearsStateAndLinks(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "", "", "Migrate me")
+
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	svc.MigrateEntry(time.Now(), 0, tomorrow)
+
+	// Original should be migrated with link
+	entries, _ := svc.LoadDay(time.Now())
+	if entries[0].State != "migrated" {
+		t.Fatalf("state = %q, want migrated", entries[0].State)
+	}
+	if entries[0].MigratedTo == "" {
+		t.Fatal("MigratedTo should be set")
+	}
+
+	// Reset
+	err := svc.ResetState(time.Now(), 0)
+	if err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+
+	entries, _ = svc.LoadDay(time.Now())
+	if entries[0].State != "" {
+		t.Errorf("state = %q, want empty", entries[0].State)
+	}
+	if entries[0].MigratedTo != "" {
+		t.Errorf("MigratedTo = %q, want empty", entries[0].MigratedTo)
+	}
+}
+
+func TestMigrateEntry_Valid(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "work", "self", "Move this")
+
+	today := time.Now()
+	tomorrow := today.AddDate(0, 0, 1)
+
+	err := svc.MigrateEntry(today, 0, tomorrow)
+	if err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	// Check original
+	origEntries, _ := svc.LoadDay(today)
+	if origEntries[0].State != "migrated" {
+		t.Errorf("original state = %q, want migrated", origEntries[0].State)
+	}
+	if origEntries[0].MigratedTo != tomorrow.Format("2006-01-02") {
+		t.Errorf("MigratedTo = %q", origEntries[0].MigratedTo)
+	}
+
+	// Check copy
+	copyEntries, _ := svc.LoadDay(tomorrow)
+	if len(copyEntries) != 1 {
+		t.Fatalf("expected 1 copy, got %d", len(copyEntries))
+	}
+	if copyEntries[0].Description != "Move this" {
+		t.Errorf("copy desc = %q", copyEntries[0].Description)
+	}
+	if copyEntries[0].MigratedFrom != today.Format("2006-01-02") {
+		t.Errorf("MigratedFrom = %q", copyEntries[0].MigratedFrom)
+	}
+	if copyEntries[0].State != "" {
+		t.Errorf("copy state = %q, want empty", copyEntries[0].State)
+	}
+}
+
+func TestMigrateEntry_SameDay(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "", "", "test")
+
+	err := svc.MigrateEntry(time.Now(), 0, time.Now())
+	if err == nil {
+		t.Fatal("expected error for same day migration")
+	}
+}
+
+func TestMigrateEntry_AlreadyMigrated(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "", "", "test")
+
+	tomorrow := time.Now().AddDate(0, 0, 1)
+	svc.MigrateEntry(time.Now(), 0, tomorrow)
+
+	err := svc.MigrateEntry(time.Now(), 0, tomorrow.AddDate(0, 0, 1))
+	if err == nil {
+		t.Fatal("expected error for already migrated")
+	}
+}
+
+func TestLoadDay_Empty(t *testing.T) {
+	svc, _ := setupTestService(t)
+	entries, err := svc.LoadDay(time.Now())
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if entries != nil {
+		t.Errorf("expected nil, got %d entries", len(entries))
 	}
 }

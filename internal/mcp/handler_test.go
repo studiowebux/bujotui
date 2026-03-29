@@ -587,3 +587,193 @@ func TestAddFutureEntry_Valid(t *testing.T) {
 		t.Errorf("expected entry in future log, got: %s", resultText(r))
 	}
 }
+
+// ---------- Additional coverage ----------
+
+func TestSearch_FindsAcrossDates(t *testing.T) {
+	h, today := newTestHandler(t)
+
+	h.HandleToolCall("add_entry", mustJSON(t, map[string]any{"description": "Searchable task", "project": "alpha"}))
+
+	args := mustJSON(t, map[string]any{"query": "Searchable", "date_from": today, "date_to": today})
+	r := h.HandleToolCall("search", args)
+	if r.IsError {
+		t.Fatalf("search: %s", resultText(r))
+	}
+	if !strings.Contains(resultText(r), "Searchable task") {
+		t.Errorf("expected match, got: %s", resultText(r))
+	}
+}
+
+func TestSearch_NoMatch(t *testing.T) {
+	h, today := newTestHandler(t)
+
+	args := mustJSON(t, map[string]any{"query": "nonexistent", "date_from": today, "date_to": today})
+	r := h.HandleToolCall("search", args)
+	if r.IsError {
+		t.Fatalf("search: %s", resultText(r))
+	}
+	if !strings.Contains(resultText(r), "No entries matching") {
+		t.Errorf("expected no match message, got: %s", resultText(r))
+	}
+}
+
+func TestListMonth_WithEntries(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	h.HandleToolCall("add_entry", mustJSON(t, map[string]any{"description": "Monthly task"}))
+
+	month := time.Now().Format("2006-01")
+	r := h.HandleToolCall("list_month", mustJSON(t, map[string]any{"month": month}))
+	if r.IsError {
+		t.Fatalf("list_month: %s", resultText(r))
+	}
+	if !strings.Contains(resultText(r), "Monthly task") {
+		t.Errorf("expected entry in month listing, got: %s", resultText(r))
+	}
+}
+
+func TestGetCollection_WithItems(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	h.HandleToolCall("create_collection", mustJSON(t, map[string]any{"name": "Books"}))
+	h.HandleToolCall("add_collection_item", mustJSON(t, map[string]any{"name": "Books", "text": "Clean Code"}))
+	h.HandleToolCall("add_collection_item", mustJSON(t, map[string]any{"name": "Books", "text": "DDIA"}))
+
+	r := h.HandleToolCall("get_collection", mustJSON(t, map[string]any{"name": "Books"}))
+	if r.IsError {
+		t.Fatalf("get: %s", resultText(r))
+	}
+	if !strings.Contains(resultText(r), "Clean Code") || !strings.Contains(resultText(r), "DDIA") {
+		t.Errorf("expected items, got: %s", resultText(r))
+	}
+}
+
+func TestRemoveCollectionItem(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	h.HandleToolCall("create_collection", mustJSON(t, map[string]any{"name": "List"}))
+	h.HandleToolCall("add_collection_item", mustJSON(t, map[string]any{"name": "List", "text": "A"}))
+	h.HandleToolCall("add_collection_item", mustJSON(t, map[string]any{"name": "List", "text": "B"}))
+
+	r := h.HandleToolCall("remove_collection_item", mustJSON(t, map[string]any{"name": "List", "index": 0}))
+	if r.IsError {
+		t.Fatalf("remove: %s", resultText(r))
+	}
+
+	r = h.HandleToolCall("get_collection", mustJSON(t, map[string]any{"name": "List"}))
+	if strings.Contains(resultText(r), "[ ] A") {
+		t.Errorf("A should be removed, got: %s", resultText(r))
+	}
+	if !strings.Contains(resultText(r), "B") {
+		t.Errorf("B should remain, got: %s", resultText(r))
+	}
+}
+
+func TestToggleCollectionItem(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	h.HandleToolCall("create_collection", mustJSON(t, map[string]any{"name": "Todo"}))
+	h.HandleToolCall("add_collection_item", mustJSON(t, map[string]any{"name": "Todo", "text": "Do it"}))
+
+	r := h.HandleToolCall("toggle_collection_item", mustJSON(t, map[string]any{"name": "Todo", "index": 0}))
+	if r.IsError {
+		t.Fatalf("toggle: %s", resultText(r))
+	}
+
+	r = h.HandleToolCall("get_collection", mustJSON(t, map[string]any{"name": "Todo"}))
+	if !strings.Contains(resultText(r), "[x]") {
+		t.Errorf("expected toggled item, got: %s", resultText(r))
+	}
+}
+
+func TestRemoveHabit(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	h.HandleToolCall("add_habit", mustJSON(t, map[string]any{"name": "Run"}))
+	r := h.HandleToolCall("remove_habit", mustJSON(t, map[string]any{"name": "Run"}))
+	if r.IsError {
+		t.Fatalf("remove: %s", resultText(r))
+	}
+
+	r = h.HandleToolCall("list_habits", mustJSON(t, map[string]any{}))
+	if !strings.Contains(resultText(r), "No habits") {
+		t.Errorf("expected no habits, got: %s", resultText(r))
+	}
+}
+
+func TestGetHabitsMonth(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	h.HandleToolCall("add_habit", mustJSON(t, map[string]any{"name": "Meditate"}))
+	h.HandleToolCall("toggle_habit", mustJSON(t, map[string]any{"name": "Meditate", "day": 1}))
+	h.HandleToolCall("toggle_habit", mustJSON(t, map[string]any{"name": "Meditate", "day": 2}))
+
+	r := h.HandleToolCall("get_habits_month", mustJSON(t, map[string]any{}))
+	if r.IsError {
+		t.Fatalf("get: %s", resultText(r))
+	}
+	if !strings.Contains(resultText(r), "Meditate") {
+		t.Errorf("expected habit name, got: %s", resultText(r))
+	}
+	if !strings.Contains(resultText(r), "Streak") {
+		t.Errorf("expected streak info, got: %s", resultText(r))
+	}
+}
+
+func TestRemoveFutureEntry(t *testing.T) {
+	h, _ := newTestHandler(t)
+	year := time.Now().Year()
+
+	h.HandleToolCall("add_future_entry", mustJSON(t, map[string]any{"month": 6, "description": "Remove me"}))
+	r := h.HandleToolCall("remove_future_entry", mustJSON(t, map[string]any{"year": year, "month": 6, "index": 0}))
+	if r.IsError {
+		t.Fatalf("remove: %s", resultText(r))
+	}
+
+	r = h.HandleToolCall("list_future", mustJSON(t, map[string]any{"year": year}))
+	txt := resultText(r)
+	if strings.Contains(txt, "Remove me") {
+		t.Errorf("removed entry should not appear, got: %s", txt)
+	}
+}
+
+func TestEditEntry_BadIndex(t *testing.T) {
+	h, today := newTestHandler(t)
+
+	args := mustJSON(t, map[string]any{"date": today, "index": 99, "description": "nope"})
+	r := h.HandleToolCall("edit_entry", args)
+	if !r.IsError {
+		t.Fatal("expected error for bad index")
+	}
+}
+
+func TestDeleteEntry_EmptyDay(t *testing.T) {
+	h, today := newTestHandler(t)
+
+	args := mustJSON(t, map[string]any{"date": today, "index": 0})
+	r := h.HandleToolCall("delete_entry", args)
+	if !r.IsError {
+		t.Fatal("expected error deleting from empty day")
+	}
+}
+
+func TestTransitionEntry_InvalidState(t *testing.T) {
+	h, today := newTestHandler(t)
+
+	h.HandleToolCall("add_entry", mustJSON(t, map[string]any{"description": "task", "symbol": "event"}))
+
+	args := mustJSON(t, map[string]any{"date": today, "index": 0, "state": "done"})
+	r := h.HandleToolCall("transition_entry", args)
+	if !r.IsError {
+		t.Fatal("expected error — event cannot transition to done")
+	}
+}
+
+func TestUnknownTool(t *testing.T) {
+	h, _ := newTestHandler(t)
+	r := h.HandleToolCall("totally_fake", json.RawMessage(`{}`))
+	if !r.IsError {
+		t.Fatal("expected error for unknown tool")
+	}
+}

@@ -49,6 +49,9 @@ func (a *App) handleHabitKey(key Key) bool {
 	if a.state.HabAdding {
 		return a.handleHabitAdd(key)
 	}
+	if a.state.HabEditing {
+		return a.handleHabitEdit(key)
+	}
 	if a.state.HabConfirm {
 		return a.handleHabitConfirm(key)
 	}
@@ -104,6 +107,12 @@ func (a *App) handleHabitKey(key Key) bool {
 		a.state.HabAdding = true
 		a.state.HabEditBuf.Clear()
 
+	case key.Char == 'e':
+		if len(ht.Habits) > 0 && a.state.HabRow < len(ht.Habits) {
+			a.state.HabEditing = true
+			a.state.HabEditBuf.Set(ht.Habits[a.state.HabRow])
+		}
+
 	case key.Char == 'd':
 		if len(ht.Habits) > 0 && a.state.HabRow < len(ht.Habits) {
 			a.state.HabConfirm = true
@@ -147,6 +156,34 @@ func (a *App) handleHabitAdd(key Key) bool {
 			}
 		}
 		a.state.HabAdding = false
+		a.state.HabEditBuf.Clear()
+
+	default:
+		a.state.HabEditBuf.HandleKey(key)
+	}
+
+	return false
+}
+
+func (a *App) handleHabitEdit(key Key) bool {
+	switch {
+	case key.Special == KeyEscape:
+		a.state.HabEditing = false
+		a.state.HabEditBuf.Clear()
+
+	case key.Special == KeyEnter:
+		newName := a.state.HabEditBuf.String()
+		if newName != "" && a.state.HabTracker != nil && a.state.HabRow < len(a.state.HabTracker.Habits) {
+			oldName := a.state.HabTracker.Habits[a.state.HabRow]
+			if newName != oldName {
+				if err := a.habSvc.RenameHabit(a.state.HabMonth, oldName, newName); err != nil {
+					a.state.StatusMsg = err.Error()
+				} else {
+					a.reloadHabits()
+				}
+			}
+		}
+		a.state.HabEditing = false
 		a.state.HabEditBuf.Clear()
 
 	default:

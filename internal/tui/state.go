@@ -85,6 +85,7 @@ type ViewState struct {
 	HabRow      int                 // cursor row (habit index)
 	HabCol      int                 // cursor col (day, 0-based = day 1)
 	HabAdding   bool                // adding a new habit
+	HabEditing  bool                // editing a habit name
 	HabEditBuf  EditBuffer
 	HabConfirm  bool                // confirming a delete
 

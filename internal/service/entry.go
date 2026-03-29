@@ -41,6 +41,9 @@ func (s *EntryService) AddEntry(symbol, state, project, person, description stri
 	if description == "" {
 		return model.Entry{}, fmt.Errorf("description must not be empty")
 	}
+	if len(description) > 1000 {
+		return model.Entry{}, fmt.Errorf("description too long (max 1000 characters)")
+	}
 
 	symName := symbol
 	if symName == "" {
@@ -76,6 +79,9 @@ func (s *EntryService) AddEntry(symbol, state, project, person, description stri
 func (s *EntryService) EditEntry(date time.Time, index int, symbol, state, project, person, description string) error {
 	if description == "" {
 		return fmt.Errorf("description must not be empty")
+	}
+	if len(description) > 1000 {
+		return fmt.Errorf("description too long (max 1000 characters)")
 	}
 
 	symName := symbol
