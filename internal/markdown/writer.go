@@ -19,8 +19,19 @@ func FormatFile(days []model.DayLog) []byte {
 		fmt.Fprintf(&b, "# %s\n", day.Date.Format(dateLayout))
 
 		if len(day.Raw) > 0 {
-			// Roundtrip mode: use Raw lines to preserve original structure
-			for _, rl := range day.Raw {
+			// Roundtrip mode: use Raw lines to preserve original structure.
+			// Strip trailing blank lines — they would accumulate on every
+			// write because the separator '\n' between days already provides one.
+			raw := day.Raw
+			for len(raw) > 0 {
+				last := raw[len(raw)-1]
+				if !last.IsEntry && strings.TrimSpace(last.Text) == "" {
+					raw = raw[:len(raw)-1]
+				} else {
+					break
+				}
+			}
+			for _, rl := range raw {
 				if rl.IsEntry {
 					if rl.EntryIndex < len(day.Entries) {
 						b.WriteString(FormatEntry(day.Entries[rl.EntryIndex]))
