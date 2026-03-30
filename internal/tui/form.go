@@ -148,32 +148,36 @@ func (a *App) updateFormCompletions() {
 	}
 
 	prefix := field.Buf.String()
-	lower := strings.ToLower(prefix)
 
 	switch field.Type {
 	case "status":
-		// Always show all states, highlight matching
-		var matches []string
-		for _, s := range a.cfg.Symbols.StateNames() {
-			if prefix == "" || strings.HasPrefix(strings.ToLower(s), lower) {
-				matches = append(matches, s)
-			}
-		}
-		// Add empty option at the top (no state = active)
-		if prefix == "" {
-			matches = append([]string{"(none)"}, matches...)
-		}
+		// Show all states — select fields must not filter by prefix,
+		// otherwise editing locks the user into the current value.
+		matches := []string{"(none)"}
+		matches = append(matches, a.cfg.Symbols.StateNames()...)
 		a.state.Completions = matches
 		a.state.CompletionType = "status"
-	case "symbol":
-		var matches []string
-		for _, s := range a.cfg.Symbols.SymbolNames() {
-			if prefix == "" || strings.HasPrefix(strings.ToLower(s), lower) {
-				matches = append(matches, s)
+		// Highlight the current value
+		a.state.CompletionIdx = 0
+		for i, m := range matches {
+			if strings.EqualFold(m, prefix) {
+				a.state.CompletionIdx = i
+				break
 			}
 		}
+		return
+	case "symbol":
+		matches := a.cfg.Symbols.SymbolNames()
 		a.state.Completions = matches
 		a.state.CompletionType = "symbol"
+		a.state.CompletionIdx = 0
+		for i, m := range matches {
+			if strings.EqualFold(m, prefix) {
+				a.state.CompletionIdx = i
+				break
+			}
+		}
+		return
 	case "project":
 		a.state.Completions = a.completer.CompleteProject(prefix)
 		a.state.CompletionType = "project"
