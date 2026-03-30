@@ -420,6 +420,47 @@ func TestFormatFile_Roundtrip(t *testing.T) {
 	}
 }
 
+func TestFormatFile_NoBlankLineAccumulation(t *testing.T) {
+	symbols := testSymbols()
+	input := "# 2026-03-29\n\n- • 2026-03-29T10:00 task A\n\n# 2026-03-28\n\n- ○ 2026-03-28T09:00 event B\n"
+
+	days, err := ParseFile(strings.NewReader(input), symbols)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	// Simulate 20 write cycles (format → parse → format → parse ...)
+	var output []byte
+	for range 20 {
+		output = FormatFile(days)
+		days, err = ParseFile(strings.NewReader(string(output)), symbols)
+		if err != nil {
+			t.Fatalf("reparse: %v", err)
+		}
+	}
+
+	// Count blank lines between the two days
+	lines := strings.Split(string(output), "\n")
+	blanks := 0
+	inGap := false
+	for _, line := range lines {
+		if strings.HasPrefix(line, "# 2026-03-28") {
+			break
+		}
+		if inGap && line == "" {
+			blanks++
+		}
+		if strings.HasPrefix(line, "- ") {
+			inGap = true
+		}
+	}
+
+	// Should be exactly 1 blank line between the last entry and next heading
+	if blanks > 1 {
+		t.Errorf("blank lines between days accumulated to %d after 20 cycles (want ≤1)", blanks)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
