@@ -173,6 +173,8 @@ func (s *Store) RemoveEntry(date time.Time, index int) error {
 			if index < 0 || index >= len(d.Entries) {
 				return fmt.Errorf("entry index %d out of range (0-%d)", index, len(d.Entries)-1)
 			}
+			// Capture ID before append shifts the underlying slice.
+			deletedID := d.Entries[index].ID
 			// Remove from entries
 			days[i].Entries = append(d.Entries[:index], d.Entries[index+1:]...)
 			// Rebuild raw lines: remove the entry's raw line and adjust indices
@@ -187,7 +189,6 @@ func (s *Store) RemoveEntry(date time.Time, index int) error {
 				newRaw = append(newRaw, rl)
 			}
 			days[i].Raw = newRaw
-			deletedID := d.Entries[index].ID
 			var deletedIDs map[string]struct{}
 			if deletedID != "" {
 				deletedIDs = map[string]struct{}{deletedID: {}}

@@ -77,9 +77,14 @@ func MergeMonths(base, incoming []model.DayLog, deletedIDs map[string]struct{}) 
 					},
 				}
 				result = insertDaySorted(result, newDay)
-				// Update index — insertDaySorted may have shifted positions,
-				// but we only need the new day's index going forward.
-				incomingIdx[dk] = len(result) - 1
+				// Find the actual insertion position — insertDaySorted places the
+				// day in sorted order, so it is not necessarily the last element.
+				for j, r := range result {
+					if r.Date.Format("2006-01-02") == dk {
+						incomingIdx[dk] = j
+						break
+					}
+				}
 				if incomingIDs[dk] == nil {
 					incomingIDs[dk] = make(map[string]struct{})
 				}

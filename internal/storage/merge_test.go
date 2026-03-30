@@ -124,3 +124,35 @@ func TestMergeMonths_ConcurrentAddNewDay(t *testing.T) {
 		t.Fatalf("expected 2 days, got %d", len(result))
 	}
 }
+
+func TestMergeMonths_ConcurrentAddNewDayMultipleEntries(t *testing.T) {
+	// Regression for incomingIdx bug: a base-only day with multiple entries
+	// must have all of them appended to the correct day, not scattered.
+	eA := makeEntry("a", "march 29")
+	eB := makeEntry("b", "march 28 first")
+	eC := makeEntry("c", "march 28 second")
+
+	base := []model.DayLog{
+		makeDay("2026-03-29", eA),
+		makeDay("2026-03-28", eB, eC),
+	}
+	incoming := []model.DayLog{makeDay("2026-03-29", eA)}
+
+	result := MergeMonths(base, incoming, nil)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 days, got %d", len(result))
+	}
+	// Find march 28
+	var march28 *model.DayLog
+	for i := range result {
+		if result[i].Date.Format("2006-01-02") == "2026-03-28" {
+			march28 = &result[i]
+		}
+	}
+	if march28 == nil {
+		t.Fatal("march 28 not found in result")
+	}
+	if len(march28.Entries) != 2 {
+		t.Fatalf("expected 2 entries on march 28, got %d: %v", len(march28.Entries), entryIDs(*march28))
+	}
+}
