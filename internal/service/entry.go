@@ -113,6 +113,7 @@ func (s *EntryService) EditEntry(date time.Time, index int, symbol, state, proje
 		Person:      person,
 		Description: description,
 		DateTime:    entries[index].DateTime,
+		ID:          entries[index].ID, // preserve stable identity across edits
 	}
 
 	if err := s.store.UpdateEntry(date, index, updated); err != nil {

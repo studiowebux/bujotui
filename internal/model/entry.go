@@ -17,14 +17,16 @@ type Symbol struct {
 //   - "scheduled" — deferred to a future date
 //   - "cancelled" — no longer relevant
 type Entry struct {
-	Symbol      Symbol // entry type: task, event, note, idea, urgent, waiting
-	State       string // lifecycle state (see Entry doc)
-	Project     string
-	Person      string
-	Description string
-	DateTime    time.Time
-	MigratedTo  string // "YYYY-MM-DD" — where this entry was migrated to
+	Symbol       Symbol // entry type: task, event, note, idea, urgent, waiting
+	State        string // lifecycle state (see Entry doc)
+	Project      string
+	Person       string
+	Description  string
+	DateTime     time.Time
+	MigratedTo   string // "YYYY-MM-DD" — where this entry was migrated to
 	MigratedFrom string // "YYYY-MM-DD" — where this entry was migrated from
+	ID           string // 16-char hex; set on first write, never changes — used for merge dedup
+	UpdatedAt    int64  // unix timestamp; updated on every write — used for last-write-wins merge
 }
 
 // DayLog groups entries under a single date heading.
