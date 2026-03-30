@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/studiowebux/bujotui/internal/config"
 	"github.com/studiowebux/bujotui/internal/service"
@@ -77,6 +79,24 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	case "people":
 		return runWithStore(configDir, dataDir, stderr, func(s *storage.Store) error {
 			return cmdPeople(s, stdout)
+		})
+	case "keygen":
+		if err := cmdKeygen(configDir, stdout); err != nil {
+			fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
+		return 0
+	case "encrypt":
+		return runWithStore(configDir, dataDir, stderr, func(s *storage.Store) error {
+			return cmdEncrypt(args[1:], s, configDir, stdout)
+		})
+	case "decrypt":
+		return runWithStore(configDir, dataDir, stderr, func(s *storage.Store) error {
+			return cmdDecrypt(args[1:], s, configDir, stdout)
+		})
+	case "keys":
+		return runWithStore(configDir, dataDir, stderr, func(s *storage.Store) error {
+			return cmdKeyList(s, stdout)
 		})
 	case "version":
 		fmt.Fprintf(stdout, "bujotui %s\n", Version)
@@ -159,6 +179,13 @@ func runTUI(configDir, dataDir string, _, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "error initializing store: %v\n", err)
 		return 1
 	}
+
+	// Try to open vault if encrypted data exists
+	if err := tryOpenVault(store, configDir, stderr); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+
 	svc := service.NewEntryService(store, cfg)
 	colSvc := service.NewCollectionService(store)
 	habSvc := service.NewHabitService(store)
@@ -169,4 +196,63 @@ func runTUI(configDir, dataDir string, _, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// tryOpenVault checks for encrypted files and opens the vault if found.
+// Tries keypair first (no prompt), then prompts for password.
+func tryOpenVault(store *storage.Store, configDir string, stderr io.Writer) error {
+	// Check if any encrypted files exist
+	_, err := findFirstEncryptedFile(store.Dir)
+	if err != nil {
+		return nil // no encrypted files, proceed without vault
+	}
+
+	// Try keypair first (silent, no prompt)
+	privPath := filepath.Join(configDir, "bujotui.key")
+	vault, slots, err := openVaultFromFiles(store.Dir, "", privPath)
+	if err == nil {
+		store.Vault = vault
+		store.KeySlots = slots
+		return nil
+	}
+
+	// Prompt for password
+	fmt.Fprint(stderr, "Password: ")
+	password, err := readPassword()
+	if err != nil {
+		return fmt.Errorf("read password: %w", err)
+	}
+	fmt.Fprintln(stderr)
+
+	vault, slots, err = openVaultFromFiles(store.Dir, password, "")
+	if err != nil {
+		return fmt.Errorf("invalid password")
+	}
+
+	store.Vault = vault
+	store.KeySlots = slots
+	return nil
+}
+
+// readPassword reads a password from stdin with echo disabled.
+func readPassword() (string, error) {
+	// Read from /dev/tty to work even when stdin is piped
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		// Fallback: read a line from stdin
+		var buf [256]byte
+		n, err := os.Stdin.Read(buf[:])
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(string(buf[:n])), nil
+	}
+	defer tty.Close()
+
+	var buf [256]byte
+	n, err := tty.Read(buf[:])
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(buf[:n])), nil
 }
