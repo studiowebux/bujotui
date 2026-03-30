@@ -113,8 +113,10 @@ type ViewState struct {
 	ScrollOffset int
 
 	// Terminal size
-	Width  int
-	Height int
+	Width      int
+	Height     int
+	FormDrawnW int // width when form was last drawn — detects resize
+	FormDrawnH int // height when form was last drawn
 
 	// Config references (for rendering)
 	Symbols *model.SymbolSet

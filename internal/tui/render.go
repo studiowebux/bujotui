@@ -23,14 +23,19 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 		width = 80
 	}
 
-	// Overlays: only redraw the overlay, not the full background
-	if vs.Mode == ModeForm && vs.Form != nil {
-		renderForm(w, vs)
-		return
-	}
+	// Help screen replaces the full screen — no background needed.
 	if vs.Mode == ModeHelp {
 		renderHelpScreen(w, vs)
 		return
+	}
+
+	// Form overlay: skip background redraw unless terminal was resized.
+	if vs.Mode == ModeForm && vs.Form != nil {
+		if vs.Width == vs.FormDrawnW && vs.Height == vs.FormDrawnH {
+			renderForm(w, vs)
+			return
+		}
+		// Size changed — fall through to redraw background, then overlay form.
 	}
 	if vs.Mode == ModeMigrate {
 		renderMigrate(w, vs)
@@ -76,7 +81,7 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 		term.Reset+term.Bold+term.FgBrightWhite, dateLabel,
 		term.Reset,
 		strings.Repeat(" ", pad),
-		term.FgGray, nav,
+		term.FgWhite, nav,
 		term.Reset, nl)
 
 	// Separator
@@ -116,7 +121,7 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 	fmt.Fprintf(w, "%s%s%s%s%s", term.FgCyan, colHeader, strings.Repeat(" ", padH), term.Reset, nl)
 
 	// Entries
-	visible := vs.Height - 6 // header + separator + column header + status + separator + help
+	visible := vs.Height - 6 // header + separator + column header + separator + help + spare
 	if visible < 1 {
 		visible = 10
 	}
@@ -156,28 +161,30 @@ func Render(w io.Writer, entries []model.Entry, date string, vs *ViewState) {
 	// Bottom separator
 	fmt.Fprintf(w, "%s%s%s%s", term.FgGray, strings.Repeat("─", width), term.Reset, nl)
 
-	// Status message (error/info from last action)
-	if vs.StatusMsg != "" {
-		fmt.Fprintf(w, " %s%s%s%s", term.Bold+term.FgRed, vs.StatusMsg, term.Reset, nl)
-	}
-
-	// Mode-specific bottom area
+	// Mode-specific bottom area.
 	switch vs.Mode {
 	case ModeFilter:
 		renderInput(w, vs)
 	case ModeConfirm:
 		renderConfirmPrompt(w, vs.ConfirmMsg)
-	case ModeHelp:
-		renderHelpBar(w, width)
-	case ModeForm:
-		renderHelpBar(w, width)
 	default:
-		renderHelpBar(w, width)
+		if vs.StatusMsg != "" {
+			// Error on the left, then help bar fills the rest of the same line.
+			msg := truncateToWidth(vs.StatusMsg, width/2)
+			fmt.Fprintf(w, " %s%s%s  ", term.Bold+term.FgRed, msg, term.Reset)
+			renderHelpBar(w, width)
+		} else {
+			renderHelpBar(w, width)
+		}
 	}
 
 	// Clear any leftover lines from previous renders
 	fmt.Fprint(w, "\x1b[0J")
 
+	// Form overlay — drawn on top of the background so resize redraws correctly.
+	if vs.Mode == ModeForm && vs.Form != nil {
+		renderForm(w, vs)
+	}
 }
 
 func renderHelpBar(w io.Writer, width int) {
@@ -208,7 +215,7 @@ func renderHelpBar(w io.Writer, width int) {
 	b.WriteByte(' ')
 	col := 1
 	for i, item := range items {
-		segment := fmt.Sprintf("%s%s%s %s%s%s", term.FgCyan, item.key, term.Reset, term.FgGray, item.label, term.Reset)
+		segment := fmt.Sprintf("%s%s%s %s%s%s", term.FgCyan, item.key, term.Reset, term.FgWhite, item.label, term.Reset)
 		// visible length (without ANSI codes)
 		visLen := len(item.key) + 1 + len(item.label)
 		if i > 0 {
@@ -329,7 +336,7 @@ func renderMigrate(w io.Writer, vs *ViewState) {
 
 	bg := term.BgDarkGray + term.FgWhite
 	hi := term.BgDarkGray + term.Bold + term.FgCyan
-	dim := term.BgDarkGray + term.FgGray
+	dim := term.BgDarkGray + term.FgWhite
 	activeLbl := term.BgDarkGray + term.Bold + term.FgWhite
 	activeField := "\x1b[48;5;238m" + term.FgWhite
 
@@ -439,7 +446,7 @@ func renderCalendar(w io.Writer, vs *ViewState) {
 	fmt.Fprintf(w, "%s%s%s%s%s%s%s",
 		term.Bold+term.FgCyan, header,
 		term.Reset, strings.Repeat(" ", pad),
-		term.FgGray, nav,
+		term.FgWhite, nav,
 		term.Reset+nl)
 
 	// Separator
@@ -609,11 +616,11 @@ func renderCalendar(w io.Writer, vs *ViewState) {
 			term.FgCyan, term.Reset)
 	} else {
 		fmt.Fprintf(w, " %sj/k%s move %s|%s %si/n%s edit note %s|%s %sEnter%s open %s|%s %s[%s prev %s]%s next %s|%s %sEsc%s back %s|%s %s?%s help",
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
-			term.FgCyan, term.Reset, term.FgCyan, term.Reset, term.FgGray, term.Reset,
-			term.FgCyan, term.Reset, term.FgGray, term.Reset,
+			term.FgCyan, term.Reset, term.FgWhite, term.Reset,
+			term.FgCyan, term.Reset, term.FgWhite, term.Reset,
+			term.FgCyan, term.Reset, term.FgWhite, term.Reset,
+			term.FgCyan, term.Reset, term.FgCyan, term.Reset, term.FgWhite, term.Reset,
+			term.FgCyan, term.Reset, term.FgWhite, term.Reset,
 			term.FgCyan, term.Reset)
 	}
 
@@ -641,6 +648,8 @@ func renderForm(w io.Writer, vs *ViewState) {
 	form := vs.Form
 	width := vs.Width
 	height := vs.Height
+	vs.FormDrawnW = width
+	vs.FormDrawnH = height
 
 	boxW := 56
 	if boxW > width-4 {
@@ -649,10 +658,10 @@ func renderForm(w io.Writer, vs *ViewState) {
 
 	bg := term.BgDarkGray + term.FgWhite
 	hi := term.BgDarkGray + term.Bold + term.FgCyan
-	dim := term.BgDarkGray + term.FgGray
+	dim := term.BgDarkGray + term.FgWhite
 	activeLbl := term.BgDarkGray + term.Bold + term.FgWhite
 	activeField := "\x1b[48;5;238m" + term.FgWhite
-	inactiveField := "\x1b[48;5;237m" + term.FgGray
+	inactiveField := "\x1b[48;5;237m" + term.FgBrightWhite
 
 	labelW := 13                // "Description:" padded to %-13s
 	fieldW := boxW - labelW - 4 // 2 left pad + 2 right pad
@@ -840,13 +849,13 @@ func renderForm(w io.Writer, vs *ViewState) {
 					row++
 				}
 				for ci := scrollStart; ci < scrollEnd; ci++ {
-					c := vs.Completions[ci]
+					c := truncateToWidth(vs.Completions[ci], boxW-6)
 					drawBg(row)
 					term.MoveCursor(w, row, startCol+2)
 					if ci == vs.CompletionIdx {
-						fmt.Fprintf(w, "%s> %s%s", activeLbl, c, term.Reset)
+						fmt.Fprintf(w, "%s> %-*s%s", activeLbl, boxW-6, c, term.Reset)
 					} else {
-						fmt.Fprintf(w, "%s  %s%s", dim, c, term.Reset)
+						fmt.Fprintf(w, "%s  %-*s%s", dim, boxW-6, c, term.Reset)
 					}
 					row++
 				}
@@ -867,7 +876,8 @@ func renderForm(w io.Writer, vs *ViewState) {
 	// Footer
 	drawBg(row)
 	term.MoveCursor(w, row, startCol+2)
-	fmt.Fprintf(w, "%s arrows:pick  Tab:next  S-Tab:prev  Enter:ok  Esc:cancel%s", dim, term.Reset)
+	helpText := truncateToWidth(" arrows:pick  Tab:next  S-Tab:prev  Enter:ok  Esc:cancel", boxW-4)
+	fmt.Fprintf(w, "%s%-*s%s", dim, boxW-4, helpText, term.Reset)
 	row++
 
 	// Fill remaining rows to clear stale content
@@ -900,7 +910,7 @@ func renderHelpScreen(w io.Writer, vs *ViewState) {
 	hi := term.BgDarkGray + term.Bold + term.FgWhite // highlighted key
 	lo := term.BgDarkGray + term.FgWhite             // normal text after key
 	section := term.BgDarkGray + term.Bold + term.FgCyan
-	dim := term.BgDarkGray + term.FgGray
+	dim := term.BgDarkGray + term.FgWhite
 
 	type helpLine struct {
 		text string // plain text content (no ANSI) for padding calc
@@ -1027,18 +1037,18 @@ func renderInput(w io.Writer, vs *ViewState) {
 			scrollEnd = len(vs.Completions)
 		}
 		if scrollStart > 0 {
-			fmt.Fprintf(w, "   %s...%d above%s%s", term.FgGray, scrollStart, term.Reset, nl)
+			fmt.Fprintf(w, "   %s...%d above%s%s", term.FgWhite, scrollStart, term.Reset, nl)
 		}
 		for i := scrollStart; i < scrollEnd; i++ {
 			c := vs.Completions[i]
 			if i == vs.CompletionIdx {
 				fmt.Fprintf(w, "   %s> %s%s%s", term.FgCyan+term.Bold, c, term.Reset, nl)
 			} else {
-				fmt.Fprintf(w, "     %s%s%s%s", term.FgGray, c, term.Reset, nl)
+				fmt.Fprintf(w, "     %s%s%s%s", term.FgWhite, c, term.Reset, nl)
 			}
 		}
 		if scrollEnd < len(vs.Completions) {
-			fmt.Fprintf(w, "   %s...%d more%s", term.FgGray, len(vs.Completions)-scrollEnd, term.Reset)
+			fmt.Fprintf(w, "   %s...%d more%s", term.FgWhite, len(vs.Completions)-scrollEnd, term.Reset)
 		}
 	}
 
@@ -1049,7 +1059,7 @@ func renderInput(w io.Writer, vs *ViewState) {
 
 // renderConfirmPrompt draws a "(y/n)" confirmation prompt with the given message.
 func renderConfirmPrompt(w io.Writer, msg string) {
-	fmt.Fprintf(w, " %s%s%s %s(y/n)%s", term.Bold+term.FgRed, msg, term.Reset, term.FgGray, term.Reset)
+	fmt.Fprintf(w, " %s%s%s %s(y/n)%s", term.Bold+term.FgRed, msg, term.Reset, term.FgWhite, term.Reset)
 }
 
 // displayWidth returns the visible width of a string (ASCII-only approximation).

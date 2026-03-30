@@ -34,9 +34,9 @@ type App struct {
 	tty   *os.File
 	ttyFd uintptr
 
-	sizeMu     sync.Mutex // protects sizeW/sizeH written by SIGWINCH goroutine
-	sizeW      int
-	sizeH      int
+	sizeMu sync.Mutex // protects sizeW/sizeH written by SIGWINCH goroutine
+	sizeW  int
+	sizeH  int
 }
 
 // New creates a new TUI App.
@@ -90,6 +90,7 @@ func (a *App) Run() error {
 	go func() {
 		for range sigCh {
 			a.updateSize()
+			a.render()
 		}
 	}()
 
