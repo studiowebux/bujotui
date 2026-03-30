@@ -308,6 +308,22 @@ func TestAddEntry_UnknownSymbol(t *testing.T) {
 	}
 }
 
+func TestAddEntry_StampsID(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "", "", "needs an id")
+
+	entries, _ := svc.LoadDay(time.Now())
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].ID == "" {
+		t.Error("expected entry to have a non-empty ID after AddEntry")
+	}
+	if entries[0].UpdatedAt == 0 {
+		t.Error("expected entry to have a non-zero UpdatedAt after AddEntry")
+	}
+}
+
 func TestEditEntry_Valid(t *testing.T) {
 	svc, _ := setupTestService(t)
 	svc.AddEntry("task", "", "work", "self", "Original")
@@ -320,6 +336,24 @@ func TestEditEntry_Valid(t *testing.T) {
 	entries, _ := svc.LoadDay(time.Now())
 	if entries[0].Description != "Updated" {
 		t.Errorf("desc = %q, want Updated", entries[0].Description)
+	}
+}
+
+func TestEditEntry_PreservesID(t *testing.T) {
+	svc, _ := setupTestService(t)
+	svc.AddEntry("task", "", "", "", "Original")
+
+	before, _ := svc.LoadDay(time.Now())
+	if before[0].ID == "" {
+		t.Fatal("entry has no ID before edit")
+	}
+	originalID := before[0].ID
+
+	svc.EditEntry(time.Now(), 0, "task", "", "", "", "Updated")
+
+	after, _ := svc.LoadDay(time.Now())
+	if after[0].ID != originalID {
+		t.Errorf("ID changed after edit: got %q, want %q", after[0].ID, originalID)
 	}
 }
 

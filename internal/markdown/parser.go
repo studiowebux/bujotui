@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -88,7 +89,7 @@ func ParseFile(r io.Reader, symbols *model.SymbolSet) ([]model.DayLog, error) {
 }
 
 // ParseEntryLine parses a single entry line.
-// Format: - {symbol} {YYYY-MM-DDThh:mm} [{project}] @{person} {description}
+// Format: - {symbol} {YYYY-MM-DDThh:mm} [{project}] @{person} [state:S] [->date] [<-date] [id:X ts:N] {description}
 func ParseEntryLine(line string, symbols *model.SymbolSet) (model.Entry, bool) {
 	rest := line
 	if !strings.HasPrefix(rest, entryPrefix) {
@@ -180,6 +181,34 @@ func ParseEntryLine(line string, symbols *model.SymbolSet) (model.Entry, bool) {
 		}
 	}
 
+	// Extract id: and ts: tokens (optional, for merge deduplication)
+	var id string
+	var updatedAt int64
+	if strings.HasPrefix(rest, "id:") {
+		spaceIdx := strings.IndexByte(rest, ' ')
+		if spaceIdx < 0 {
+			id = rest[3:]
+			rest = ""
+		} else {
+			id = rest[3:spaceIdx]
+			rest = strings.TrimLeft(rest[spaceIdx+1:], " ")
+		}
+	}
+	if strings.HasPrefix(rest, "ts:") {
+		spaceIdx := strings.IndexByte(rest, ' ')
+		var tsStr string
+		if spaceIdx < 0 {
+			tsStr = rest[3:]
+			rest = ""
+		} else {
+			tsStr = rest[3:spaceIdx]
+			rest = strings.TrimLeft(rest[spaceIdx+1:], " ")
+		}
+		if v, err := strconv.ParseInt(tsStr, 10, 64); err == nil {
+			updatedAt = v
+		}
+	}
+
 	// Remaining is description
 	desc := rest
 
@@ -192,5 +221,7 @@ func ParseEntryLine(line string, symbols *model.SymbolSet) (model.Entry, bool) {
 		DateTime:     dt,
 		MigratedTo:   migratedTo,
 		MigratedFrom: migratedFrom,
+		ID:           id,
+		UpdatedAt:    updatedAt,
 	}, true
 }

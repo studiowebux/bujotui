@@ -82,6 +82,9 @@ func FormatEntry(e model.Entry) string {
 	if e.MigratedFrom != "" {
 		fmt.Fprintf(&b, " <-%s", e.MigratedFrom)
 	}
+	if e.ID != "" {
+		fmt.Fprintf(&b, " id:%s ts:%d", e.ID, e.UpdatedAt)
+	}
 	b.WriteByte(' ')
 	b.WriteString(e.Description)
 	return b.String()

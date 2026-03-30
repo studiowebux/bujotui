@@ -60,9 +60,24 @@ func (s *Store) LoadMonth(t time.Time) ([]model.DayLog, error) {
 }
 
 // SaveMonth writes DayLogs to the monthly file atomically.
+// It re-reads the current disk state and merges before writing so that
+// concurrent writers (multiple MCP agents, the TUI) do not clobber each other.
 func (s *Store) SaveMonth(t time.Time, days []model.DayLog) error {
+	return s.saveMonth(t, days, nil)
+}
+
+// saveMonth is the internal implementation; deletedIDs prevents explicitly
+// removed entries from being resurrected by the merge.
+func (s *Store) saveMonth(t time.Time, days []model.DayLog, deletedIDs map[string]struct{}) error {
 	path := s.MonthFile(t)
-	data := markdown.FormatFile(days)
+	// LoadMonth already returns (nil, nil) for missing files, so any
+	// error here is a real I/O failure.
+	current, err := s.LoadMonth(t)
+	if err != nil {
+		return fmt.Errorf("re-read for merge: %w", err)
+	}
+	merged := MergeMonths(current, days, deletedIDs)
+	data := markdown.FormatFile(merged)
 	return s.writeFile(path, data)
 }
 
@@ -83,6 +98,13 @@ func (s *Store) LoadDay(t time.Time) ([]model.Entry, error) {
 
 // AddEntry appends an entry to the appropriate date section in the month file.
 func (s *Store) AddEntry(e model.Entry) error {
+	if e.ID == "" {
+		e.ID = newEntryID()
+	}
+	if e.UpdatedAt == 0 {
+		e.UpdatedAt = now()
+	}
+
 	days, err := s.LoadMonth(e.DateTime)
 	if err != nil {
 		return err
@@ -119,6 +141,8 @@ func (s *Store) AddEntry(e model.Entry) error {
 
 // UpdateEntry replaces the entry at the given index for the given date.
 func (s *Store) UpdateEntry(date time.Time, index int, e model.Entry) error {
+	e.UpdatedAt = now()
+
 	days, err := s.LoadMonth(date)
 	if err != nil {
 		return err
@@ -151,6 +175,8 @@ func (s *Store) RemoveEntry(date time.Time, index int) error {
 			if index < 0 || index >= len(d.Entries) {
 				return fmt.Errorf("entry index %d out of range (0-%d)", index, len(d.Entries)-1)
 			}
+			// Capture ID before append shifts the underlying slice.
+			deletedID := d.Entries[index].ID
 			// Remove from entries
 			days[i].Entries = append(d.Entries[:index], d.Entries[index+1:]...)
 			// Rebuild raw lines: remove the entry's raw line and adjust indices
@@ -165,7 +191,11 @@ func (s *Store) RemoveEntry(date time.Time, index int) error {
 				newRaw = append(newRaw, rl)
 			}
 			days[i].Raw = newRaw
-			return s.SaveMonth(date, days)
+			var deletedIDs map[string]struct{}
+			if deletedID != "" {
+				deletedIDs = map[string]struct{}{deletedID: {}}
+			}
+			return s.saveMonth(date, days, deletedIDs)
 		}
 	}
 
