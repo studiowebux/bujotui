@@ -336,6 +336,31 @@ func TestFormatEntry_Roundtrip(t *testing.T) {
 				Description: "dropped",
 			},
 		},
+		{
+			name: "with id and updatedAt",
+			entry: model.Entry{
+				Symbol:      model.Symbol{Name: "task", Char: "•"},
+				DateTime:    localTime(2026, 3, 27, 10, 0),
+				Description: "concurrent safe entry",
+				ID:          "a1b2c3d4e5f6a7b8",
+				UpdatedAt:   1711234567,
+			},
+		},
+		{
+			name: "full entry with id and updatedAt",
+			entry: model.Entry{
+				Symbol:       model.Symbol{Name: "task", Char: "•"},
+				DateTime:     localTime(2026, 3, 27, 14, 30),
+				Project:      "myproject",
+				Person:       "alice",
+				State:        "done",
+				MigratedTo:   "2026-04-01",
+				MigratedFrom: "2026-03-20",
+				Description:  "implement parser",
+				ID:           "deadbeefcafe0123",
+				UpdatedAt:    1711234999,
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -490,5 +515,11 @@ func assertEntryEqual(t *testing.T, want, got model.Entry) {
 	}
 	if got.Description != want.Description {
 		t.Errorf("Description = %q, want %q", got.Description, want.Description)
+	}
+	if got.ID != want.ID {
+		t.Errorf("ID = %q, want %q", got.ID, want.ID)
+	}
+	if got.UpdatedAt != want.UpdatedAt {
+		t.Errorf("UpdatedAt = %d, want %d", got.UpdatedAt, want.UpdatedAt)
 	}
 }
