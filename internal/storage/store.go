@@ -32,26 +32,38 @@ func (s *Store) MonthFile(t time.Time) string {
 	return filepath.Join(s.Dir, "daily", t.Format("2006-01")+".md")
 }
 
+// readFile reads a file and returns its bytes.
+func (s *Store) readFile(path string) ([]byte, error) {
+	return os.ReadFile(filepath.Clean(path)) // #nosec G304 -- path from user-configured data dir
+}
+
+// writeFile versions the existing file then atomically writes new data.
+func (s *Store) writeFile(path string, data []byte) error {
+	if err := saveVersion(path); err != nil {
+		return fmt.Errorf("save version: %w", err)
+	}
+	return AtomicWriteFile(path, data, 0o644)
+}
+
 // LoadMonth reads and parses the monthly file.
 // Returns (nil, nil) if the file does not exist — callers should treat nil as empty.
 func (s *Store) LoadMonth(t time.Time) ([]model.DayLog, error) {
-	path := filepath.Clean(s.MonthFile(t))
-	f, err := os.Open(path) // #nosec G304 -- path is constructed from user-configured data dir
+	path := s.MonthFile(t)
+	data, err := s.readFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("open month file: %w", err)
+		return nil, fmt.Errorf("load month file: %w", err)
 	}
-	defer f.Close()
-	return markdown.ParseFile(f, s.Config.Symbols)
+	return markdown.ParseBytes(data, s.Config.Symbols)
 }
 
 // SaveMonth writes DayLogs to the monthly file atomically.
 func (s *Store) SaveMonth(t time.Time, days []model.DayLog) error {
 	path := s.MonthFile(t)
 	data := markdown.FormatFile(days)
-	return AtomicWriteFile(path, data, 0o644)
+	return s.writeFile(path, data)
 }
 
 // LoadDay returns entries for a specific date.

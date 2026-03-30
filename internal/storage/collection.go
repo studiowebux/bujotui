@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,13 +54,11 @@ func (s *Store) ListCollections() ([]string, error) {
 
 // readCollectionName reads the first heading from a collection file.
 func (s *Store) readCollectionName(path string) (string, error) {
-	f, err := os.Open(filepath.Clean(path))
+	data, err := s.readFile(path)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "# ") {
@@ -72,27 +71,25 @@ func (s *Store) readCollectionName(path string) (string, error) {
 // LoadCollection reads a collection from its markdown file.
 func (s *Store) LoadCollection(name string) (model.Collection, error) {
 	path := s.collectionFile(name)
-	f, err := os.Open(filepath.Clean(path))
+	data, err := s.readFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return model.Collection{}, fmt.Errorf("collection %q not found", name)
 		}
-		return model.Collection{}, fmt.Errorf("open collection: %w", err)
+		return model.Collection{}, fmt.Errorf("load collection: %w", err)
 	}
-	defer f.Close()
-
-	return parseCollection(f)
+	return parseCollectionBytes(data)
 }
 
-// parseCollection parses a collection markdown file.
+// parseCollectionBytes parses a collection markdown file.
 // Format:
 //
 //	# Collection Name
 //
 //	- [ ] unchecked item
 //	- [x] checked item
-func parseCollection(f *os.File) (model.Collection, error) {
-	scanner := bufio.NewScanner(f)
+func parseCollectionBytes(data []byte) (model.Collection, error) {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	var col model.Collection
 
 	for scanner.Scan() {
@@ -148,7 +145,7 @@ func (s *Store) SaveCollection(col model.Collection) error {
 
 	path := s.collectionFile(col.Name)
 	data := formatCollection(col)
-	return AtomicWriteFile(path, data, 0o644)
+	return s.writeFile(path, data)
 }
 
 // formatCollection renders a collection to markdown bytes.

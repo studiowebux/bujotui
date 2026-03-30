@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -19,6 +20,11 @@ const (
 	// All parsed and formatted times are interpreted in the system's local timezone.
 	dateTimeLayout = "2006-01-02T15:04"
 )
+
+// ParseBytes parses markdown bytes into DayLogs.
+func ParseBytes(data []byte, symbols *model.SymbolSet) ([]model.DayLog, error) {
+	return ParseFile(bytes.NewReader(data), symbols)
+}
 
 // ParseFile parses a monthly markdown file into DayLogs.
 // It uses the provided SymbolSet to resolve symbol characters.
