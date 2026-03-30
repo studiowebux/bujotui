@@ -70,8 +70,10 @@ func (s *Store) SaveMonth(t time.Time, days []model.DayLog) error {
 // removed entries from being resurrected by the merge.
 func (s *Store) saveMonth(t time.Time, days []model.DayLog, deletedIDs map[string]struct{}) error {
 	path := s.MonthFile(t)
+	// LoadMonth already returns (nil, nil) for missing files, so any
+	// error here is a real I/O failure.
 	current, err := s.LoadMonth(t)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil {
 		return fmt.Errorf("re-read for merge: %w", err)
 	}
 	merged := MergeMonths(current, days, deletedIDs)

@@ -85,9 +85,7 @@ func MergeMonths(base, incoming []model.DayLog, deletedIDs map[string]struct{}) 
 						break
 					}
 				}
-				if incomingIDs[dk] == nil {
-					incomingIDs[dk] = make(map[string]struct{})
-				}
+				incomingIDs[dk] = make(map[string]struct{})
 			}
 			if incomingIDs[dk] == nil {
 				incomingIDs[dk] = make(map[string]struct{})

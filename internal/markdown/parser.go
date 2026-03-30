@@ -89,7 +89,7 @@ func ParseFile(r io.Reader, symbols *model.SymbolSet) ([]model.DayLog, error) {
 }
 
 // ParseEntryLine parses a single entry line.
-// Format: - {symbol} {YYYY-MM-DDThh:mm} [{project}] @{person} {description}
+// Format: - {symbol} {YYYY-MM-DDThh:mm} [{project}] @{person} [state:S] [->date] [<-date] [id:X ts:N] {description}
 func ParseEntryLine(line string, symbols *model.SymbolSet) (model.Entry, bool) {
 	rest := line
 	if !strings.HasPrefix(rest, entryPrefix) {
